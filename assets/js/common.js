@@ -107,6 +107,21 @@ export function initTheme() {
   });
 }
 
+// ---------- Tinggi layar nyata (address bar & keyboard HP) ----------
+export function initViewportHeight(onResize) {
+  const vv = window.visualViewport;
+  const apply = () => {
+    const h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
+    if (vv) window.scrollTo(0, 0);
+    onResize?.();
+  };
+  (vv || window).addEventListener("resize", apply);
+  if (vv) vv.addEventListener("scroll", () => window.scrollTo(0, 0));
+  window.addEventListener("orientationchange", () => setTimeout(apply, 300));
+  apply();
+}
+
 // ---------- Layar penuh ----------
 export function initFullscreen() {
   const btns = $$("[data-fullscreen]");

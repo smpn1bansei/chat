@@ -1,5 +1,5 @@
 import {
-  auth, db, $, $$, esc, escMultiline, toast, initTheme, initFullscreen, friendlyError, configWarning, tsMillis, fmtClock,
+  auth, db, $, $$, esc, escMultiline, toast, initTheme, initFullscreen, initViewportHeight, friendlyError, configWarning, tsMillis, fmtClock,
   fmtCountdown, fmtTimer, avatarHtml, rankPlayers, beep, confirmDialog, promptDialog, deleteRoomDeep,
   joinUrl, setLoading, ONLINE_WINDOW, DEFAULT_SETTINGS
 } from "./common.js";
@@ -10,6 +10,7 @@ import {
 
 initTheme();
 initFullscreen();
+initViewportHeight();
 configWarning();
 
 const code = new URLSearchParams(location.search).get("room");

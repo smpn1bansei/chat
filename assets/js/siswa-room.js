@@ -1,6 +1,6 @@
 import {
-  auth, db, $, $$, esc, escMultiline, toast, initTheme, initFullscreen, friendlyError, configWarning, tsMillis,
-  fmtClock, fmtCountdown, avatarHtml, initials, avatarColor, rankPlayers, beep, celebrate, confirmDialog, AppError, DEFAULT_SETTINGS
+  auth, db, $, $$, esc, escMultiline, toast, initTheme, initFullscreen, initViewportHeight, friendlyError, configWarning, tsMillis,
+  fmtClock, fmtCountdown, avatarHtml, rankPlayers, beep, celebrate, confirmDialog, AppError, DEFAULT_SETTINGS
 } from "./common.js";
 import {
   doc, collection, query, orderBy, onSnapshot, runTransaction, updateDoc, serverTimestamp
@@ -8,6 +8,11 @@ import {
 
 initTheme();
 initFullscreen();
+initViewportHeight(() => {
+  // keyboard muncul → pastikan chat terbaru & kolom jawaban tetap terlihat
+  const f = document.getElementById("feed");
+  if (document.activeElement?.id === "answerInput" && f) f.scrollTop = f.scrollHeight;
+});
 configWarning();
 
 const code = new URLSearchParams(location.search).get("room");
@@ -102,8 +107,6 @@ function start() {
     if (player.kicked) return fatal("🚫", "Kamu dikeluarkan", "Guru telah mengeluarkanmu dari room ini.");
     $("#meName").textContent = player.name;
     $("#meKelas").textContent = player.kelasLabel || "";
-    $("#meAvatar").textContent = initials(player.name);
-    $("#meAvatar").style.background = avatarColor(player.name);
     const chip = $("#myScore");
     chip.querySelector("span").textContent = player.score || 0;
     if (prevScore !== undefined && prevScore !== player.score) {
@@ -334,6 +337,12 @@ function autosize() {
   input.style.height = Math.min(input.scrollHeight, 140) + "px";
 }
 input.addEventListener("input", () => { autosize(); sendBtn.disabled = input.disabled || !input.value.trim(); });
+input.addEventListener("blur", () => document.body.classList.remove("typing"));
+input.addEventListener("focus", () => setTimeout(() => {
+  document.body.classList.add("typing");
+  feed.scrollTop = feed.scrollHeight;
+  $("#composer").scrollIntoView({ block: "end" });
+}, 300));
 input.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendAnswer(); }
 });
