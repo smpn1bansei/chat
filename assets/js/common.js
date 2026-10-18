@@ -7,6 +7,10 @@ import {
   getFirestore, collection, getDocs, writeBatch, doc, setDoc, getDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
+import { APP, appTitle, applyAppInfo } from "./app-config.js";
+
+export { APP, appTitle };
+applyAppInfo();
 
 export const configReady = !!firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("GANTI");
 export const app = initializeApp(firebaseConfig);

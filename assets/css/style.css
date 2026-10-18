@@ -729,3 +729,15 @@ body.room-page { height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); mi
 @media (max-width: 560px) {
   .tag-filter { max-width: none; width: 100%; }
 }
+
+/* Versi & lisensi */
+.footer-license { font-size: .76rem; }
+.footer-license a { font-weight: 700; }
+.license-page { max-width: 760px; width: 100%; margin: 0 auto; padding: 28px 20px; flex: 1; }
+.license-page h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; }
+.license-page h2 { font-size: 1.05rem; font-weight: 800; margin: 22px 0 8px; }
+.license-page ol, .license-page ul { padding-left: 22px; margin: 0; }
+.license-page li { margin-bottom: 6px; }
+.license-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: .92rem; margin-top: 14px; }
+.license-meta dt { color: var(--muted); font-weight: 600; }
+.license-meta dd { margin: 0; font-weight: 700; }

@@ -1,8 +1,10 @@
-# 💬 Educhat — Aplikasi Chat Kuis Pembelajaran
+# 💬 Educhat v.1.0 — Aplikasi Chat Kuis Pembelajaran
 
 Educhat adalah aplikasi kuis berbentuk ruang chat untuk **siswa** dan **guru**, dibuat dengan HTML, CSS, dan JavaScript murni plus **Firebase** (Authentication + Cloud Firestore) secara realtime.
 
-> Development by **Andri Fernanda, S.Pd., Gr.** © 2026
+> **Versi:** 1.0 · **Programmer:** Andri Fernanda, S.Pd., Gr. · © 2026
+>
+> Gratis digunakan untuk pembelajaran. **Dilarang memodifikasi atau menjual tanpa izin tertulis** dari smpn01bandarseikijang@gmail.com. Lihat [LICENSE](LICENSE).
 
 ---
 
@@ -91,6 +93,7 @@ kelas.html          Ruang kuis siswa (chat + papan skor)
 guru.html           Login & dashboard guru
 guru-room.html      Kelola room (pertanyaan, penilaian, pengaturan, skor)
 assets/css/style.css
+assets/js/app-config.js        ← nama & versi aplikasi (mis. "1.0" → "1.1")
 assets/js/firebase-config.js   ← isi konfigurasi Firebase di sini
 assets/js/common.js            Inisialisasi Firebase & fungsi bersama
 assets/js/siswa-join.js / siswa-room.js / guru.js / guru-room.js
@@ -125,6 +128,22 @@ Siswa yang pindah perangkat harus mengisi **nama yang sama** dengan yang tercata
 
 Aturan mode jawaban dan batas "N tercepat" tidak hanya dicek di aplikasi, tapi juga di **Firestore Rules**. Siswa mengambil slot dalam satu transaksi, jadi batas tetap berlaku walau banyak siswa mengirim di detik yang sama.
 
+## 🏷️ Versi
+Nama dan versi aplikasi diatur di `assets/js/app-config.js`:
+```js
+export const APP = { name: "Educhat", version: "1.0", ... };
+```
+Saat ada pembaruan, cukup ubah `version` (misal `"1.1"`). Teks **Educhat v.1.1** otomatis tampil di judul brand, footer, dan halaman lisensi.
+
+## 📜 Lisensi
+Hak Cipta © 2026 **Andri Fernanda, S.Pd., Gr.** Seluruh hak dilindungi.
+
+- ✅ **Boleh** digunakan secara gratis untuk kegiatan pembelajaran, dan dipasang apa adanya pada proyek Firebase sendiri.
+- 🚫 **Dilarang** memodifikasi, menjual, menyewakan, atau menyebarluaskan ulang sebagai karya sendiri **tanpa izin tertulis**.
+- ✉️ Permohonan izin: **smpn01bandarseikijang@gmail.com**
+
+Teks lengkap: [LICENSE](LICENSE) · juga tersedia di aplikasi pada halaman `lisensi.html`.
+
 ---
 
-Development by **Andri Fernanda, S.Pd., Gr.** © 2026
+Educhat v.1.0 · Development by **Andri Fernanda, S.Pd., Gr.** © 2026
