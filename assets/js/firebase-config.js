@@ -4,10 +4,10 @@
 //  (Firebase Console → Project settings → General → Your apps → Web app)
 // =============================================================
 export const firebaseConfig = {
-  apiKey: "GANTI_DENGAN_API_KEY",
-  authDomain: "GANTI_PROJECT_ID.firebaseapp.com",
-  projectId: "GANTI_PROJECT_ID",
-  storageBucket: "GANTI_PROJECT_ID.appspot.com",
-  messagingSenderId: "GANTI_SENDER_ID",
-  appId: "GANTI_APP_ID"
+  apiKey: "AIzaSyAEA1AkplKoodo48j0Wq7v-rjbeLGaa4E0",
+  authDomain: "chat-34bdb.firebaseapp.com",
+  projectId: "chat-34bdb",
+  storageBucket: "chat-34bdb.firebasestorage.app",
+  messagingSenderId: "472867638426",
+  appId: "1:472867638426:web:240bdf994b56af5d9ba323"
 };
