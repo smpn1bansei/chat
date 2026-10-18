@@ -2,7 +2,7 @@ import {
   auth, db, $, $$, esc, toast, initTheme, initFullscreen, setLoading, friendlyError, configWarning, tsMillis, fmtDate,
   fmtTimer, avatarHtml, confirmDialog, promptDialog, deleteRoomDeep, AppError, DEFAULT_SETTINGS
 } from "./common.js";
-import { listenBank, openBankEditor, deleteBankItem, bankItemHtml, filterBank } from "./bank.js";
+import { listenBank, openBankEditor, deleteBankItem, bankBrowser } from "./bank.js";
 import {
   onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -121,7 +121,11 @@ async function showDashboard(user) {
   }, err => toast(friendlyError(err), "error"));
 
   unsubBank?.();
-  unsubBank = listenBank(user.uid, items => { bank = items; renderBank(); });
+  unsubBank = listenBank(user.uid, items => {
+    bank = items;
+    $("#bankCount").textContent = bank.length;
+    bankView.setItems(bank);
+  });
 }
 
 function renderTeacher() {
@@ -158,18 +162,16 @@ $$("#mainTabs button").forEach(b => b.onclick = () => {
 });
 
 $("#bankAddBtn").onclick = () => openBankEditor(me.uid);
-$("#bankSearch").addEventListener("input", renderBank);
 
-function renderBank() {
-  $("#bankCount").textContent = bank.length;
-  const list = filterBank(bank, $("#bankSearch").value);
-  $("#bankList").innerHTML = list.length ? list.map(it => bankItemHtml(it, `
+const bankView = bankBrowser({
+  listEl: $("#bankList"), searchEl: $("#bankSearch"), tagEl: $("#bankTag"), pagerEl: $("#bankPager"),
+  actions: it => `
       <button class="btn btn-ghost btn-icon btn-sm" data-bedit="${it.id}" title="Edit">✏️</button>
-      <button class="btn btn-danger-soft btn-icon btn-sm" data-bdel="${it.id}" title="Hapus">🗑</button>`)).join("")
-    : `<div class="empty card"><div class="big">📚</div>
-        <b>${bank.length ? "Tidak ada soal yang cocok" : "Bank soal masih kosong"}</b>
-        <p>${bank.length ? "Coba kata kunci lain." : "Klik “Tambah Soal” untuk menyiapkan soal isian atau pilihan ganda."}</p></div>`;
-}
+      <button class="btn btn-danger-soft btn-icon btn-sm" data-bdel="${it.id}" title="Hapus">🗑</button>`,
+  emptyHtml: total => `<div class="empty card"><div class="big">📚</div>
+        <b>${total ? "Tidak ada soal yang cocok" : "Bank soal masih kosong"}</b>
+        <p>${total ? "Coba kata kunci atau label lain." : "Klik “Tambah Soal” untuk menyiapkan soal isian atau pilihan ganda."}</p></div>`
+});
 
 $("#bankList").addEventListener("click", async e => {
   const ed = e.target.closest("[data-bedit]"), del = e.target.closest("[data-bdel]");

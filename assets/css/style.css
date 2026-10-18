@@ -720,3 +720,12 @@ body.room-page { height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); mi
 .switch:checked { background: var(--success); }
 .switch:checked::after { transform: translateX(18px); }
 .switch:focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent); }
+
+/* Paginasi & filter label bank soal */
+.tag-filter { width: auto; max-width: 240px; padding: 10px 12px; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.pager-info { font-size: .85rem; color: var(--muted); text-align: center; flex: 1; }
+.pager-info b { color: var(--text); }
+@media (max-width: 560px) {
+  .tag-filter { max-width: none; width: 100%; }
+}

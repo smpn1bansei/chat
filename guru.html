@@ -108,11 +108,13 @@
     <section id="bankView" class="hidden">
       <div class="toolbar">
         <input class="search" id="bankSearch" placeholder="🔍 Cari soal, opsi, atau label…">
+        <select class="tag-filter" id="bankTag" aria-label="Filter label"></select>
         <div class="grow"></div>
         <button class="btn btn-primary" id="bankAddBtn">＋ Tambah Soal</button>
       </div>
       <p class="hint" style="margin:0 0 12px">Siapkan soal sebelum kelas dimulai. Di halaman kelola room, buka <b>📚 Bank Soal</b> lalu kirim soal dengan sekali klik. Soal <b>pilihan ganda dinilai otomatis</b>.</p>
       <div class="bank-list" id="bankList"></div>
+      <div class="pager hidden" id="bankPager"></div>
     </section>
   </main>
 

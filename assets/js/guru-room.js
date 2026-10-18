@@ -3,7 +3,7 @@ import {
   fmtCountdown, fmtTimer, avatarHtml, rankPlayers, beep, confirmDialog, promptDialog, deleteRoomDeep,
   joinUrl, setLoading, serverNow, syncClock, ONLINE_WINDOW, BOARD_MS, DEFAULT_SETTINGS, LETTERS
 } from "./common.js";
-import { listenBank, openBankEditor, saveBankItem, bankItemHtml, filterBank, optionEditor } from "./bank.js";
+import { listenBank, openBankEditor, saveBankItem, bankBrowser, optionEditor } from "./bank.js";
 import {
   doc, collection, query, orderBy, onSnapshot, getDoc, updateDoc, writeBatch, serverTimestamp,
   increment, Timestamp, setDoc
@@ -158,7 +158,6 @@ function start() {
     renderLiveStats();
   }, err));
 
-  unsubs.push(listenBank(me.uid, items => { bank = items; if ($("#bankModal").classList.contains("show")) renderBankModal(); }));
 
   setInterval(tick, 1000);
   setInterval(() => { renderLeaderboard(); renderLiveStats(); }, 15000);
@@ -458,21 +457,28 @@ async function sendQuestion(data) {
 }
 
 // ---------- Bank soal di dalam room ----------
-$("#bankBtn").onclick = () => { renderBankModal(); $("#bankModal").classList.add("show"); setTimeout(() => $("#bankSearch").focus(), 50); };
+// Bank soal baru dimuat saat popup pertama kali dibuka (tidak menghabiskan kuota bila tidak dipakai)
+let bankLoaded = false;
+const bankView = bankBrowser({
+  listEl: $("#bankList"), searchEl: $("#bankSearch"), tagEl: $("#bankTag"), pagerEl: $("#bankPager"),
+  actions: it => `
+      <button class="btn btn-primary btn-sm" data-bsend="${it.id}" title="Kirim sekarang ke siswa">➤ Kirim</button>
+      <button class="btn btn-ghost btn-sm" data-buse="${it.id}" title="Salin ke kolom tulis untuk diedit">✏️ Edit dulu</button>`,
+  emptyHtml: total => `<div class="empty"><div class="big">📚</div><b>${total ? "Tidak ada soal yang cocok" : "Bank soal masih kosong"}</b>
+       <p>${total ? "Coba kata kunci atau label lain." : "Tambahkan soal lewat tombol “Soal baru” atau tombol 💾 di kolom tulis."}</p></div>`
+});
+$("#bankBtn").onclick = () => {
+  if (!bankLoaded) {
+    bankLoaded = true;
+    unsubs.push(listenBank(me.uid, items => { bank = items; bankView.setItems(bank); }));
+  }
+  $("#bankModal").classList.add("show");
+  setTimeout(() => $("#bankSearch").focus(), 50);
+};
 const closeBank = () => $("#bankModal").classList.remove("show");
 $("#bankClose").onclick = closeBank;
 $("#bankModal").addEventListener("mousedown", e => { if (e.target.id === "bankModal") closeBank(); });
-$("#bankSearch").addEventListener("input", renderBankModal);
 $("#bankNew").onclick = () => openBankEditor(me.uid);
-
-function renderBankModal() {
-  const list = filterBank(bank, $("#bankSearch").value);
-  $("#bankList").innerHTML = list.length ? list.map(it => bankItemHtml(it, `
-      <button class="btn btn-primary btn-sm" data-bsend="${it.id}" title="Kirim sekarang ke siswa">➤ Kirim</button>
-      <button class="btn btn-ghost btn-sm" data-buse="${it.id}" title="Salin ke kolom tulis untuk diedit">✏️ Edit dulu</button>`)).join("")
-    : `<div class="empty"><div class="big">📚</div><b>${bank.length ? "Tidak ada soal yang cocok" : "Bank soal masih kosong"}</b>
-       <p>Tambahkan soal lewat tombol “Soal baru” atau tombol 💾 di kolom tulis.</p></div>`;
-}
 
 $("#bankList").addEventListener("click", async e => {
   const send = e.target.closest("[data-bsend]"), use = e.target.closest("[data-buse]");

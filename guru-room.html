@@ -193,8 +193,12 @@
           <button class="btn btn-ghost btn-icon btn-sm" id="bankClose" aria-label="Tutup">✕</button>
         </div>
       </div>
-      <input class="search" id="bankSearch" placeholder="🔍 Cari soal, opsi, atau label…" style="margin-bottom:12px">
-      <div class="bank-list" id="bankList"></div>
+      <div class="toolbar" style="margin-bottom:12px">
+        <input class="search" id="bankSearch" placeholder="🔍 Cari soal, opsi, atau label…">
+        <select class="tag-filter" id="bankTag" aria-label="Filter label"></select>
+      </div>
+      <div class="bank-list" id="bankList"><div class="empty"><span class="spinner"></span></div></div>
+      <div class="pager hidden" id="bankPager"></div>
     </div>
   </div>
 

@@ -197,8 +197,66 @@ export function bankItemHtml(it, actions) {
   </div>`;
 }
 
-export function filterBank(items, q) {
+export function filterBank(items, q, tag = "") {
   q = (q || "").trim().toLowerCase();
-  if (!q) return items;
-  return items.filter(it => [it.text, it.tag, ...(it.options || [])].some(v => String(v || "").toLowerCase().includes(q)));
+  return items.filter(it =>
+    (!tag || (it.tag || "") === tag) &&
+    (!q || [it.text, it.tag, ...(it.options || [])].some(v => String(v || "").toLowerCase().includes(q))));
+}
+
+// ---------- Daftar bank soal: cari + filter label + paginasi ----------
+export const BANK_PER_PAGE = 20;
+const NO_TAG = "\u0000tanpa-label";
+
+/**
+ * Pasang daftar bank soal berhalaman.
+ * actions(item) → HTML tombol aksi; emptyHtml(totalAll) → HTML saat kosong.
+ * Mengembalikan { setItems(items), render() }.
+ */
+export function bankBrowser({ listEl, searchEl, tagEl, pagerEl, actions, emptyHtml, perPage = BANK_PER_PAGE }) {
+  let items = [], page = 1;
+
+  function fillTags() {
+    const cur = tagEl.value;
+    const tags = [...new Set(items.map(it => it.tag || NO_TAG))]
+      .sort((a, b) => a === NO_TAG ? 1 : b === NO_TAG ? -1 : a.localeCompare(b, "id"));
+    tagEl.innerHTML = `<option value="">🏷 Semua label (${items.length})</option>` + tags.map(t => {
+      const n = items.filter(it => (it.tag || NO_TAG) === t).length;
+      return `<option value="${esc(t)}">${t === NO_TAG ? "Tanpa label" : esc(t)} (${n})</option>`;
+    }).join("");
+    tagEl.value = tags.includes(cur) ? cur : "";
+  }
+
+  function render() {
+    const tag = tagEl.value;
+    const list = tag === NO_TAG
+      ? filterBank(items.filter(it => !it.tag), searchEl.value)
+      : filterBank(items, searchEl.value, tag);
+    const pages = Math.max(1, Math.ceil(list.length / perPage));
+    page = Math.min(Math.max(1, page), pages);
+    const from = (page - 1) * perPage;
+    const slice = list.slice(from, from + perPage);
+
+    listEl.innerHTML = slice.length ? slice.map(it => bankItemHtml(it, actions(it))).join("") : emptyHtml(items.length);
+    pagerEl.classList.toggle("hidden", list.length <= perPage);
+    pagerEl.innerHTML = `
+      <button type="button" class="btn btn-ghost btn-sm" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>‹ <span class="hide-xs">Sebelumnya</span></button>
+      <span class="pager-info"><b>${from + 1}–${from + slice.length}</b> dari ${list.length} soal · hal. ${page}/${pages}</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-page="${page + 1}" ${page >= pages ? "disabled" : ""}><span class="hide-xs">Berikutnya</span> ›</button>`;
+  }
+
+  searchEl.addEventListener("input", () => { page = 1; render(); });
+  tagEl.addEventListener("change", () => { page = 1; render(); });
+  pagerEl.addEventListener("click", e => {
+    const b = e.target.closest("[data-page]");
+    if (!b || b.disabled) return;
+    page = Number(b.dataset.page);
+    render();
+    listEl.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+
+  return {
+    setItems(list) { items = list; fillTags(); render(); },
+    render
+  };
 }
