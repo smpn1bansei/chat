@@ -1,9 +1,10 @@
 import {
   auth, db, $, $$, esc, escMultiline, toast, initTheme, initFullscreen, initViewportHeight, friendlyError, configWarning, tsMillis,
-  fmtClock, fmtCountdown, avatarHtml, rankPlayers, beep, celebrate, confirmDialog, AppError, DEFAULT_SETTINGS
+  fmtClock, fmtCountdown, avatarHtml, rankPlayers, beep, celebrate, confirmDialog, AppError, DEFAULT_SETTINGS,
+  serverNow, syncClock, HEARTBEAT_MS, LETTERS
 } from "./common.js";
 import {
-  doc, collection, query, orderBy, onSnapshot, runTransaction, updateDoc, serverTimestamp
+  doc, collection, query, orderBy, where, onSnapshot, runTransaction, setDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 initTheme();
@@ -32,6 +33,7 @@ const seenQuestions = new Set();
 const myStatuses = new Map();
 let msgsReady = false, ansReady = false;
 const unsubs = [];
+let unsubAnswers = null, answersScope = null;
 
 const feed = $("#feed");
 const input = $("#answerInput");
@@ -78,6 +80,7 @@ if (!auth.currentUser) {
 
 function fatal(icon, title, msg) {
   unsubs.forEach(u => u());
+  unsubAnswers?.();
   $("#loading").innerHTML = `
     <div class="card">
       <div class="big">${icon}</div>
@@ -100,6 +103,7 @@ function start() {
     if (!snap.exists()) return fatal("🗑️", "Room tidak tersedia", "Room ini telah dihapus oleh guru.");
     room = { id: snap.id, ...snap.data() };
     $("#loading").classList.add("hidden");
+    subscribeAnswers();
     renderHeader();
     renderFeed();
     renderComposer();
@@ -146,8 +150,38 @@ function start() {
     renderComposer();
   }, onErr));
 
-  unsubs.push(onSnapshot(query(answersCol, orderBy("createdAt")), snap => {
-    answers = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
+  unsubs.push(onSnapshot(collection(db, "rooms", code, "players"), snap => {
+    players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderLeaderboard();
+  }, onErr));
+
+  // Tanda online disimpan di koleksi terpisah (hanya dibaca guru) -> hemat kuota.
+  // Penulisan pertama sekaligus menyamakan jam HP dengan jam server.
+  const presRef = doc(db, "rooms", code, "presence", pid);
+  syncClock(presRef, "lastSeen");
+  setInterval(() => {
+    if (document.visibilityState === "visible" && player && !player.kicked && player.uid === uid) {
+      setDoc(presRef, { lastSeen: serverTimestamp() }).catch(() => {});
+    }
+  }, HEARTBEAT_MS);
+  setInterval(() => syncClock(presRef, "lastSeen"), 10 * 60 * 1000);
+
+  setInterval(tick, 1000);
+}
+
+/**
+ * "Tidak terlihat" -> HP siswa hanya memuat jawabannya sendiri (paling hemat kuota).
+ * Mode lain -> memuat semua jawaban di room.
+ */
+function subscribeAnswers() {
+  const scope = settings().showAnswers === "never" ? "mine" : "all";
+  if (scope === answersScope) return;
+  answersScope = scope;
+  unsubAnswers?.();
+  const q = scope === "mine" ? query(answersCol, where("playerId", "==", pid)) : query(answersCol, orderBy("createdAt"));
+  unsubAnswers = onSnapshot(q, snap => {
+    answers = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }))
+      .sort((a, b) => (tsMillis(a.createdAt) || 0) - (tsMillis(b.createdAt) || 0));
     for (const a of answers) {
       if (a.playerId !== pid) continue;
       const prev = myStatuses.get(a.id);
@@ -155,7 +189,7 @@ function start() {
       if (!ansReady || prev === undefined || prev === a.status) continue;
       if (a.status === "correct") {
         play("correct"); celebrate();
-        toast(`Jawabanmu BENAR! +${a.points} poin 🎉`, "success", 4000);
+        toast(`Jawabanmu BENAR! +${a.points} poin${a.bonus ? ` (termasuk ⚡ bonus tercepat +${a.bonus})` : ""} 🎉`, "success", 4500);
       } else if (a.status === "wrong") {
         play("wrong");
         toast("Jawabanmu belum tepat. Tetap semangat! 💪", "error");
@@ -163,21 +197,8 @@ function start() {
     }
     ansReady = true;
     renderFeed();
-  }, onErr));
-
-  unsubs.push(onSnapshot(collection(db, "rooms", code, "players"), snap => {
-    players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderLeaderboard();
-  }, onErr));
-
-  // detak keberadaan (online)
-  setInterval(() => {
-    if (document.visibilityState === "visible" && player && !player.kicked) {
-      updateDoc(doc(db, "rooms", code, "players", pid), { lastSeen: serverTimestamp() }).catch(() => {});
-    }
-  }, 30000);
-
-  setInterval(tick, 1000);
+    renderComposer();
+  }, onErr);
 }
 
 // ---------- Header ----------
@@ -193,7 +214,8 @@ function renderHeader() {
   }[room.status] || "";
   $("#roomStatus").innerHTML = `${st}
     <span class="badge hide-sm">${s.answerMode === "single" ? "1× jawab" : "Jawab berkali-kali"}</span>
-    ${s.maxFastest > 0 ? `<span class="badge badge-accent hide-sm">⚡ ${s.maxFastest} tercepat</span>` : ""}`;
+    ${s.maxFastest > 0 ? `<span class="badge badge-accent hide-sm">⚡ ${s.maxFastest} tercepat</span>` : ""}
+    ${s.bonus1 > 0 ? `<span class="badge badge-warning hide-sm" title="Bonus untuk penjawab benar tercepat">🥇 +${s.bonus1} bonus</span>` : ""}`;
 }
 
 // ---------- Feed ----------
@@ -207,7 +229,7 @@ function activeQuestion() {
 function statusBadge(m) {
   if (m.status === "open") {
     const dl = tsMillis(m.deadline);
-    if (dl && dl <= Date.now()) return `<span class="badge badge-warning">⏰ Waktu habis</span>`;
+    if (dl && dl <= serverNow()) return `<span class="badge badge-warning">⏰ Waktu habis</span>`;
     return `<span class="badge badge-success">● Dibuka</span>`;
   }
   return `<span class="badge">Ditutup</span>`;
@@ -235,9 +257,10 @@ function questionBubble(m) {
   const active = activeQuestion()?.id === m.id;
   const resp = (m.responders || []).length;
   const dl = tsMillis(m.deadline), startMs = tsMillis(m.createdAt);
-  const running = dl && m.status === "open" && dl > Date.now();
+  const now = serverNow();
+  const running = dl && m.status === "open" && dl > now;
   const timer = running ? `
-      <span>⏱ <b data-deadline="${dl}">${fmtCountdown((dl - Date.now()) / 1000)}</b></span>` : "";
+      <span>⏱ <b data-deadline="${dl}">${fmtCountdown((dl - now) / 1000)}</b></span>` : "";
   const bar = running ? `
       <div class="timebar"><i data-bar-start="${startMs}" data-bar-end="${dl}" style="width:${barPct(startMs, dl)}%"></i></div>` : "";
   const slots = m.status === "open" && s.maxFastest > 0
@@ -248,18 +271,32 @@ function questionBubble(m) {
     <div class="bubble q-bubble ${active ? "active" : ""}">
       <div class="q-head">
         <span class="q-num">PERTANYAAN #${m.number || ""}</span>
+        ${m.kind === "mc" ? `<span class="badge badge-accent">🔘 Pilihan ganda</span>` : ""}
         <span class="badge badge-primary">+${m.points} poin</span>
         ${statusBadge(m)}
       </div>
       <div class="q-text">${esc(m.text)}</div>
+      ${m.kind === "mc" ? mcOptionsHtml(m) : ""}
       ${bar}
       <div class="q-foot">${timer}${slots}<span>${fmtClock(startMs)}</span></div>
     </div>
   </div>`;
 }
 
+/** Daftar opsi PG di gelembung soal: tandai pilihanku & kunci (setelah ditutup) */
+function mcOptionsHtml(m) {
+  const mine = answers.find(a => a.questionId === m.id && a.playerId === pid);
+  const reveal = m.status !== "open" && Number.isInteger(m.reveal) ? m.reveal : null;
+  return `<div class="q-opts">${(m.options || []).map((o, i) => {
+    const cls = [mine?.choice === i ? "picked" : "", reveal === i ? "key" : "",
+      reveal !== null && mine?.choice === i && reveal !== i ? "miss" : ""].join(" ");
+    const tag = reveal === i ? "<em>✓ kunci</em>" : mine?.choice === i ? "<em>pilihanmu</em>" : "";
+    return `<div class="q-opt ${cls}"><b>${LETTERS[i]}</b><span>${esc(o)}</span>${tag}</div>`;
+  }).join("")}</div>`;
+}
+
 function barPct(start, end) {
-  return Math.max(0, Math.min(100, ((end - Date.now()) / (end - start)) * 100));
+  return Math.max(0, Math.min(100, ((end - serverNow()) / (end - start)) * 100));
 }
 
 function renderFeed() {
@@ -287,6 +324,12 @@ function renderFeed() {
     if (m.type !== "question") continue;
     html += questionBubble(m);
     const list = byQ[m.id] || [];
+    if (s.showAnswers === "never") {
+      for (const a of list) if (a.playerId === pid) html += answerBubble(a);
+      const others = (m.responders || []).filter(x => x !== pid).length;
+      if (others) html += `<div class="hidden-note">🙈 ${others} teman sudah menjawab · jawaban teman tidak ditampilkan</div>`;
+      continue;
+    }
     const showOthers = s.showAnswers === "always" || m.status !== "open";
     let hidden = 0;
     for (const a of list) {
@@ -308,25 +351,41 @@ function composerState() {
   const q = activeQuestion();
   if (!q) return { ok: false, msg: "⏳ Menunggu pertanyaan dari guru…" };
   const s = settings();
+  const mc = q.kind === "mc";
   const dl = tsMillis(q.deadline);
-  if (dl && dl <= Date.now()) return { ok: false, q, msg: "⏰ Waktu menjawab sudah habis." };
+  if (dl && dl <= serverNow()) return { ok: false, q, msg: "⏰ Waktu menjawab sudah habis." };
   const resp = q.responders || [];
   const inR = resp.includes(pid);
-  if (s.answerMode === "single" && inR) return { ok: false, q, msg: "✅ Jawabanmu sudah terkirim. Tunggu penilaian guru." };
+  if ((s.answerMode === "single" || mc) && inR) {
+    return { ok: false, q, msg: mc ? "✅ Pilihanmu sudah terkirim & dinilai otomatis." : "✅ Jawabanmu sudah terkirim. Tunggu penilaian guru." };
+  }
   if (!inR && s.maxFastest > 0 && resp.length >= s.maxFastest) {
     return { ok: false, q, msg: `🚫 Slot penuh — ${s.maxFastest} siswa tercepat sudah menjawab.` };
   }
   const left = s.maxFastest > 0 && !inR ? ` · sisa ${s.maxFastest - resp.length} slot` : "";
   return {
-    ok: true, q,
-    msg: (s.answerMode === "single" ? "✍️ Kamu hanya bisa menjawab 1 kali" : "✍️ Kamu boleh menjawab berkali-kali") + left
+    ok: true, q, mc,
+    msg: (mc ? "👇 Ketuk satu pilihan jawaban (hanya 1 kali)" :
+      s.answerMode === "single" ? "✍️ Kamu hanya bisa menjawab 1 kali" : "✍️ Kamu boleh menjawab berkali-kali") + left
   };
 }
 
 let lastHint = "";
+let lastChoicesKey = "";
 function renderComposer() {
   const st = composerState();
-  input.disabled = !st.ok || sending;
+  // pilihan ganda: tampilkan tombol opsi besar, sembunyikan kolom ketik
+  const showMc = !!(st.ok && st.mc);
+  $("#answerForm").classList.toggle("hidden", showMc);
+  const box = $("#mcChoices");
+  box.classList.toggle("hidden", !showMc);
+  const ck = showMc ? `${st.q.id}|${sending}` : "";
+  if (ck !== lastChoicesKey) {
+    lastChoicesKey = ck;
+    box.innerHTML = showMc ? (st.q.options || []).map((o, i) =>
+      `<button type="button" class="mc-choice" data-choice="${i}" ${sending ? "disabled" : ""}><b>${LETTERS[i]}</b><span>${esc(o)}</span></button>`).join("") : "";
+  }
+  input.disabled = !st.ok || sending || showMc;
   sendBtn.disabled = !st.ok || sending || !input.value.trim();
   $("#composer").classList.toggle("locked", !st.ok);
   if (st.msg !== lastHint) {
@@ -341,6 +400,20 @@ function renderComposer() {
   } else rt.classList.add("hidden");
   input.placeholder = st.ok ? "Ketik jawabanmu… (Enter untuk kirim)" : "Belum bisa menjawab";
 }
+
+$("#mcChoices").addEventListener("click", async e => {
+  const b = e.target.closest("[data-choice]");
+  if (!b) return;
+  const st = composerState();
+  if (!st.ok || !st.mc) return;
+  const i = Number(b.dataset.choice);
+  const ok = await confirmDialog({
+    title: `Kirim jawaban ${LETTERS[i]}?`,
+    message: `<b>${LETTERS[i]}. ${esc(st.q.options[i])}</b><br>Jawaban pilihan ganda tidak bisa diubah setelah dikirim.`,
+    okText: "Kirim", cancelText: "Ganti pilihan"
+  });
+  if (ok) sendAnswer({ choice: i });
+});
 
 function autosize() {
   input.style.height = "auto";
@@ -358,12 +431,15 @@ input.addEventListener("keydown", e => {
 });
 $("#answerForm").addEventListener("submit", e => { e.preventDefault(); sendAnswer(); });
 
-async function sendAnswer() {
-  const text = input.value.trim();
-  if (!text || sending) return;
+async function sendAnswer({ choice = null } = {}) {
+  if (sending) return;
   const st = composerState();
   if (!st.ok) return toast(st.msg, "error");
   const q = st.q;
+  const isMc = q.kind === "mc";
+  if (isMc && choice === null) return;
+  const text = isMc ? `${LETTERS[choice]}. ${q.options[choice]}` : input.value.trim();
+  if (!text) return;
   sending = true;
   renderComposer();
   try {
@@ -377,21 +453,22 @@ async function sendAnswer() {
       const s = { ...DEFAULT_SETTINGS, ...(r.settings || {}) };
       if (r.status === "ended") throw new AppError("Room sudah berakhir.");
       if (qd.status !== "open") throw new AppError("Pertanyaan sudah ditutup guru.");
-      if (qd.deadline && tsMillis(qd.deadline) <= Date.now()) throw new AppError("Waktu menjawab sudah habis.");
+      if (qd.deadline && tsMillis(qd.deadline) <= serverNow()) throw new AppError("Waktu menjawab sudah habis.");
       const resp = qd.responders || [];
       const inR = resp.includes(pid);
-      if (s.answerMode === "single" && inR) throw new AppError("Kamu sudah menjawab pertanyaan ini.");
+      const single = s.answerMode === "single" || qd.kind === "mc";
+      if (single && inR) throw new AppError("Kamu sudah menjawab pertanyaan ini.");
       if (!inR && s.maxFastest > 0 && resp.length >= s.maxFastest) throw new AppError("Yah, slot jawaban sudah penuh! Lebih cepat lagi ya ⚡");
 
-      const aRef = s.answerMode === "single" ? doc(answersCol, `${q.id}_${pid}`) : doc(answersCol);
+      const aRef = single ? doc(answersCol, `${q.id}_${pid}`) : doc(answersCol);
       tx.update(qRef, { responders: inR ? resp : [...resp, pid], answerCount: (qd.answerCount || 0) + 1, lastResponder: pid });
       tx.set(aRef, {
         questionId: q.id, playerId: pid, uid, name: player.name, kelasLabel: player.kelasLabel || "",
-        text, status: "pending", points: 0, createdAt: serverTimestamp()
+        text, status: "pending", points: 0, createdAt: serverTimestamp(),
+        ...(isMc ? { choice } : {})
       });
     });
-    input.value = "";
-    autosize();
+    if (!isMc) { input.value = ""; autosize(); }
     play("answer");
   } catch (e) {
     toast(friendlyError(e), "error", 4000);
@@ -458,7 +535,7 @@ function showFinal() {
 
 // ---------- Ticker 1 detik ----------
 function tick() {
-  const now = Date.now();
+  const now = serverNow();
   let expired = false;
   $$("[data-deadline]").forEach(el => {
     const left = (Number(el.dataset.deadline) - now) / 1000;

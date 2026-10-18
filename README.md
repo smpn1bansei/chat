@@ -27,9 +27,13 @@ Educhat adalah aplikasi kuis berbentuk ruang chat untuk **siswa** dan **guru**, 
   - Mode jawaban: **1× jawab per pertanyaan** *(default)* atau **boleh berkali-kali**.
   - **Poin default** per pertanyaan *(default 10)*.
   - **Maks. penjawab tercepat** (misal 5 = hanya 5 siswa tercepat yang bisa mengirim; 0 = tanpa batas).
-  - Jawaban teman terlihat langsung / setelah pertanyaan ditutup (anti-mencontek).
+  - Jawaban teman: **tidak terlihat** *(default, paling hemat kuota)* / setelah pertanyaan ditutup / langsung terlihat.
+  - **Bonus penjawab benar tercepat** 🥇🥈🥉 (misal +3/+2/+1), dihitung ulang otomatis setiap kali penilaian berubah.
   - Timer default pertanyaan.
-- Kirim **pertanyaan** (poin & timer bisa diatur per soal) atau **pengumuman**.
+- Kirim **soal isian** (dinilai guru), **soal pilihan ganda** (dinilai otomatis), atau **pengumuman**. Poin & timer bisa diatur per soal.
+- **Bank soal**: siapkan soal di dashboard (tab 📚 Bank Soal), lalu kirim dari room dengan sekali klik. Soal yang sedang/pernah dikirim juga bisa disimpan ke bank (💾).
+- Kunci jawaban pilihan ganda disimpan terpisah (hanya bisa dibaca guru) dan baru ditampilkan ke siswa setelah soal ditutup.
+- Panel pengaturan dan papan skor bisa disembunyikan (tombol ⚙️ / 🏆 di header) agar area kuis lebih luas.
 - Jawaban diurutkan dari yang tercepat (🥇🥈🥉 + selisih detik). **Klik jawaban** untuk menandai benar (poin masuk) / salah — atau pakai tombol ✓ / ✗. Klik lagi untuk membatalkan.
 - Tutup / buka lagi pertanyaan, ubah poin pertanyaan (otomatis menyesuaikan skor), hapus pertanyaan (poin ditarik kembali). Pertanyaan bertimer ditutup otomatis.
 - Papan skor dengan indikator online, ubah poin manual (±), keluarkan siswa / pulihkan.
@@ -102,10 +106,18 @@ rooms/{kode}/players/{kelas__absen} name, kelas, absen, kelasLabel, uid(perangka
                                     contoh ID: "7-1__5", "IX-IPS1__12"
 rooms/{kode}/messages/{id}          type(question|info), number, text, points, status(open|closed),
                                     deadline, responders[] (ID siswa), answerCount
-rooms/{kode}/answers/{id}           questionId, playerId, uid, name, text, status(pending|correct|wrong), points
+rooms/{kode}/answers/{id}           questionId, playerId, uid, name, text, choice(PG), status(pending|correct|wrong), points, bonus
+rooms/{kode}/keys/{questionId}      correct  (kunci PG, hanya guru)
+rooms/{kode}/presence/{id_siswa}    lastSeen (tanda online, hanya dibaca guru)
+teachers/{uid}/bank/{id}            kind(text|mc), text, options[], correct, points, timer, tag
 ```
 
 Siswa yang pindah perangkat harus mengisi **nama yang sama** dengan yang tercatat; jika nama berbeda, no. absen dianggap sudah dipakai orang lain. Guru tetap bisa mengeluarkan siswa yang menyamar.
+
+## 💰 Hemat kuota Firebase (paket gratis: 50.000 baca/hari)
+- Pilih **"Jawaban teman: Tidak terlihat"** (default). HP siswa hanya memuat jawabannya sendiri, jadi setiap jawaban baru hanya dibaca oleh pengirimnya dan guru, bukan oleh seluruh kelas.
+- Tanda online siswa disimpan di koleksi `presence` yang hanya dibaca guru, sehingga detak online tidak membebani HP siswa lain.
+- Hitung mundur memakai **jam server Firebase**, bukan jam HP, sehingga HP dengan jam yang salah tetap menampilkan sisa waktu yang benar.
 
 Aturan mode jawaban dan batas "N tercepat" tidak hanya dicek di aplikasi, tapi juga di **Firestore Rules**. Siswa mengambil slot dalam satu transaksi, jadi batas tetap berlaku walau banyak siswa mengirim di detik yang sama.
 

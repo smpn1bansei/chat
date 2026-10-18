@@ -2,6 +2,7 @@ import {
   auth, db, $, $$, esc, toast, initTheme, initFullscreen, setLoading, friendlyError, configWarning, tsMillis, fmtDate,
   fmtTimer, avatarHtml, confirmDialog, promptDialog, deleteRoomDeep, AppError, DEFAULT_SETTINGS
 } from "./common.js";
+import { listenBank, openBankEditor, deleteBankItem, bankItemHtml, filterBank } from "./bank.js";
 import {
   onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -15,6 +16,7 @@ initFullscreen();
 configWarning();
 
 let me = null, teacher = null, rooms = [], filter = "all", unsubRooms = null;
+let bank = [], unsubBank = null;
 
 // =============== LOGIN ===============
 $("#togglePw").onclick = () => {
@@ -53,11 +55,25 @@ $("#forgotLink").onclick = async e => {
   } catch (err) { toast(friendlyError(err), "error"); }
 };
 
-$("#logoutBtn").onclick = async () => {
-  if (await confirmDialog({ title: "Keluar dari akun?", message: "Anda akan kembali ke halaman login guru.", okText: "Keluar" })) {
+// =============== MENU AKUN ===============
+const accMenu = $("#accountMenu");
+const setMenu = open => {
+  accMenu.classList.toggle("show", open);
+  $("#accountBtn").setAttribute("aria-expanded", String(open));
+};
+$("#accountBtn").onclick = e => { e.stopPropagation(); setMenu(!accMenu.classList.contains("show")); };
+document.addEventListener("click", e => { if (!e.target.closest("#account")) setMenu(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") setMenu(false); });
+accMenu.addEventListener("click", async e => {
+  const b = e.target.closest("[data-menu]");
+  if (!b) return;
+  setMenu(false);
+  if (b.dataset.menu === "rename") renameTeacher();
+  if (b.dataset.menu === "logout" &&
+      await confirmDialog({ title: "Keluar dari akun?", message: "Anda akan kembali ke halaman login guru.", okText: "Keluar", danger: true })) {
     await signOut(auth);
   }
-};
+});
 
 onAuthStateChanged(auth, user => {
   if (user && !user.isAnonymous) showDashboard(user);
@@ -67,11 +83,11 @@ onAuthStateChanged(auth, user => {
 function showLogin() {
   me = null;
   unsubRooms?.(); unsubRooms = null;
+  unsubBank?.(); unsubBank = null;
   $("#loginView").classList.remove("hidden");
   $("#loginFooter").classList.remove("hidden");
   $("#dashView").classList.add("hidden");
-  $("#logoutBtn").classList.add("hidden");
-  $("#teacherChip").classList.add("hidden");
+  $("#account").classList.add("hidden");
 }
 
 // =============== DASHBOARD ===============
@@ -80,7 +96,6 @@ async function showDashboard(user) {
   $("#loginView").classList.add("hidden");
   $("#loginFooter").classList.add("hidden");
   $("#dashView").classList.remove("hidden");
-  $("#logoutBtn").classList.remove("hidden");
 
   const h = new Date().getHours();
   $("#greet").textContent = h < 11 ? "Selamat pagi ☀️" : h < 15 ? "Selamat siang 🌤️" : h < 18 ? "Selamat sore 🌇" : "Selamat malam 🌙";
@@ -104,16 +119,21 @@ async function showDashboard(user) {
     rooms = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
     renderRooms();
   }, err => toast(friendlyError(err), "error"));
+
+  unsubBank?.();
+  unsubBank = listenBank(user.uid, items => { bank = items; renderBank(); });
 }
 
 function renderTeacher() {
   $("#teacherName").textContent = teacher.displayName;
-  const chip = $("#teacherChip");
-  chip.innerHTML = `${avatarHtml(teacher.displayName)}<span class="hide-sm">${esc(me.email)}</span>`;
-  chip.classList.remove("hidden");
+  $("#accountAvatar").innerHTML = avatarHtml(teacher.displayName);
+  $("#accountName").textContent = teacher.displayName;
+  $("#menuName").textContent = teacher.displayName;
+  $("#menuEmail").textContent = me.email;
+  $("#account").classList.remove("hidden");
 }
 
-$("#renameBtn").onclick = async () => {
+async function renameTeacher() {
   const name = await promptDialog({
     title: "Ubah nama tampilan", label: "Nama yang dilihat siswa", value: teacher.displayName,
     placeholder: "cth. Bu Sari, S.Pd."
@@ -128,7 +148,39 @@ $("#renameBtn").onclick = async () => {
     renderTeacher();
     toast("Nama berhasil diubah.", "success");
   } catch (err) { toast(friendlyError(err), "error"); }
-};
+}
+
+// =============== TAB: ROOM / BANK SOAL ===============
+$$("#mainTabs button").forEach(b => b.onclick = () => {
+  $$("#mainTabs button").forEach(x => x.classList.toggle("active", x === b));
+  $("#roomsView").classList.toggle("hidden", b.dataset.view !== "rooms");
+  $("#bankView").classList.toggle("hidden", b.dataset.view !== "bank");
+});
+
+$("#bankAddBtn").onclick = () => openBankEditor(me.uid);
+$("#bankSearch").addEventListener("input", renderBank);
+
+function renderBank() {
+  $("#bankCount").textContent = bank.length;
+  const list = filterBank(bank, $("#bankSearch").value);
+  $("#bankList").innerHTML = list.length ? list.map(it => bankItemHtml(it, `
+      <button class="btn btn-ghost btn-icon btn-sm" data-bedit="${it.id}" title="Edit">✏️</button>
+      <button class="btn btn-danger-soft btn-icon btn-sm" data-bdel="${it.id}" title="Hapus">🗑</button>`)).join("")
+    : `<div class="empty card"><div class="big">📚</div>
+        <b>${bank.length ? "Tidak ada soal yang cocok" : "Bank soal masih kosong"}</b>
+        <p>${bank.length ? "Coba kata kunci lain." : "Klik “Tambah Soal” untuk menyiapkan soal isian atau pilihan ganda."}</p></div>`;
+}
+
+$("#bankList").addEventListener("click", async e => {
+  const ed = e.target.closest("[data-bedit]"), del = e.target.closest("[data-bdel]");
+  if (ed) return openBankEditor(me.uid, bank.find(x => x.id === ed.dataset.bedit));
+  if (del) {
+    const it = bank.find(x => x.id === del.dataset.bdel);
+    if (!it || !await confirmDialog({ title: "Hapus soal ini?", message: esc(it.text.slice(0, 120)), okText: "Hapus", danger: true })) return;
+    try { await deleteBankItem(me.uid, it.id); toast("Soal dihapus.", "success"); }
+    catch (err) { toast(friendlyError(err), "error"); }
+  }
+});
 
 // Filter & cari
 $$("#filterSeg button").forEach(b => b.onclick = () => {

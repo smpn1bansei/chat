@@ -19,10 +19,23 @@
     </a>
     <div class="spacer"></div>
     <div class="topbar-actions">
-      <div class="room-owner hidden" id="teacherChip"></div>
       <button class="btn btn-ghost btn-icon" data-fullscreen title="Layar penuh" aria-label="Layar penuh">⛶</button>
       <button class="btn btn-ghost btn-icon" data-theme-toggle title="Ganti tema" aria-label="Ganti tema">🌓</button>
-      <button class="btn btn-ghost btn-sm hidden" id="logoutBtn">↩ <span class="hide-sm">Keluar</span></button>
+      <div class="account hidden" id="account">
+        <button class="account-btn" id="accountBtn" aria-haspopup="menu" aria-expanded="false" title="Akun">
+          <span id="accountAvatar"></span>
+          <span class="account-name hide-sm" id="accountName"></span>
+          <svg class="caret" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="menu" id="accountMenu" role="menu">
+          <div class="menu-head"><b id="menuName"></b><small id="menuEmail"></small></div>
+          <button role="menuitem" data-menu="rename">✏️ Ubah nama tampilan</button>
+          <button role="menuitem" data-menu="logout" class="danger">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+            Keluar dari akun
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -62,10 +75,16 @@
         <h1 id="teacherName">Guru</h1>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost" id="renameBtn">✏️ Ubah nama</button>
         <button class="btn btn-primary" id="newRoomBtn">＋ Buat Room Baru</button>
       </div>
     </div>
+
+    <div class="seg main-tabs" id="mainTabs">
+      <button class="active" data-view="rooms">🏫 Daftar Room</button>
+      <button data-view="bank">📚 Bank Soal <span class="badge" id="bankCount">0</span></button>
+    </div>
+
+    <section id="roomsView">
 
     <div class="stats">
       <div class="card stat"><div class="stat-ico">🏫</div><div><div class="stat-val" id="statAll">0</div><div class="stat-lbl">Semua room</div></div></div>
@@ -84,6 +103,17 @@
     <div class="room-grid" id="roomGrid">
       <div class="empty" style="grid-column:1/-1"><span class="spinner"></span></div>
     </div>
+    </section>
+
+    <section id="bankView" class="hidden">
+      <div class="toolbar">
+        <input class="search" id="bankSearch" placeholder="🔍 Cari soal, opsi, atau label…">
+        <div class="grow"></div>
+        <button class="btn btn-primary" id="bankAddBtn">＋ Tambah Soal</button>
+      </div>
+      <p class="hint" style="margin:0 0 12px">Siapkan soal sebelum kelas dimulai. Di halaman kelola room, buka <b>📚 Bank Soal</b> lalu kirim soal dengan sekali klik. Soal <b>pilihan ganda dinilai otomatis</b>.</p>
+      <div class="bank-list" id="bankList"></div>
+    </section>
   </main>
 
   <!-- ============ MODAL BUAT ROOM ============ -->
@@ -126,6 +156,7 @@
           <div class="settings-grid">
             <label class="field"><span>Jawaban teman terlihat</span>
               <select id="cShow">
+                <option value="never">Tidak terlihat (hemat kuota)</option>
                 <option value="closed">Setelah pertanyaan ditutup</option>
                 <option value="always">Langsung terlihat</option>
               </select></label>

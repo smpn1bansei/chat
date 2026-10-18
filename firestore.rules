@@ -17,6 +17,11 @@ service cloud.firestore {
     match /teachers/{uid} {
       allow read: if signedIn();
       allow write: if isTeacher() && request.auth.uid == uid;
+
+      // Bank soal pribadi guru
+      match /bank/{id} {
+        allow read, write: if isTeacher() && request.auth.uid == uid;
+      }
     }
 
     match /rooms/{code} {
@@ -102,7 +107,7 @@ service cloud.firestore {
                     && after.hasAll(before)
                     && pid in after
                     && !(pid in before)))
-            && (s.answerMode != 'single' || !(pid in before))
+            && ((s.answerMode != 'single' && resource.data.get('kind', 'text') != 'mc') || !(pid in before))
             && (s.maxFastest == 0 || after.size() <= s.maxFastest)
             && (resource.data.deadline == null || request.time < resource.data.deadline);
         }
@@ -122,7 +127,8 @@ service cloud.firestore {
             && ownsPlayer(pid)
             && q.status == 'open'
             && pid in q.responders
-            && (s.answerMode != 'single' || aid == request.resource.data.questionId + '_' + pid);
+            && ((s.answerMode != 'single' && q.get('kind', 'text') != 'mc')
+                || aid == request.resource.data.questionId + '_' + pid);
         }
 
         allow read: if signedIn();
@@ -136,6 +142,23 @@ service cloud.firestore {
           && canAnswer();
         // Penilaian (benar/salah) hanya oleh guru pemilik room
         allow update, delete: if isOwner();
+      }
+
+      // ---------------- Kunci jawaban pilihan ganda ----------------
+      // Hanya guru pemilik yang bisa membaca → siswa tidak bisa mengintip kunci.
+      match /keys/{qid} {
+        allow read, write: if isOwner();
+      }
+
+      // ---------------- Tanda online siswa ----------------
+      // Dipisah dari dokumen siswa agar detak online tidak memicu pembacaan
+      // papan skor di HP semua siswa (hemat kuota).
+      match /presence/{pid} {
+        allow read: if isOwner() || ownsPlayer(pid);
+        allow write: if isOwner()
+          || (signedIn() && ownsPlayer(pid)
+              && request.resource.data.keys().hasOnly(['lastSeen'])
+              && request.resource.data.lastSeen == request.time);
       }
     }
   }

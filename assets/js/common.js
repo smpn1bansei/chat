@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, getDocs, writeBatch, doc
+  getFirestore, collection, getDocs, writeBatch, doc, setDoc, getDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -14,15 +14,46 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 export const KELAS = ["7", "8", "9", "10", "11", "12"];
-export const ONLINE_WINDOW = 70 * 1000;
+export const ONLINE_WINDOW = 100 * 1000;
+export const HEARTBEAT_MS = 45 * 1000;
 
 export const DEFAULT_SETTINGS = {
   answerMode: "single",   // "single" | "multiple"
   defaultPoints: 10,
   maxFastest: 0,          // 0 = tanpa batas
-  showAnswers: "closed",  // "closed" | "always"
-  defaultTimer: 0         // detik, 0 = tanpa batas waktu
+  showAnswers: "never",   // "never" | "closed" | "always"  (never = paling hemat kuota)
+  defaultTimer: 0,        // detik, 0 = tanpa batas waktu
+  bonus1: 0,              // bonus poin penjawab benar tercepat #1
+  bonus2: 0,              // #2
+  bonus3: 0               // #3
 };
+
+export const SHOW_ANSWERS_LABEL = {
+  never: "Tidak terlihat (hemat kuota)",
+  closed: "Setelah pertanyaan ditutup",
+  always: "Langsung terlihat"
+};
+export const LETTERS = ["A", "B", "C", "D", "E", "F"];
+
+// ---------- Jam server ----------
+// Jam HP siswa/guru bisa meleset. Semua hitung mundur memakai serverNow().
+let clockOffset = 0;
+export const serverNow = () => Date.now() + clockOffset;
+/**
+ * Tulis serverTimestamp ke `ref.field`, baca kembali, lalu hitung selisih
+ * jam perangkat terhadap jam server Firebase.
+ */
+export async function syncClock(ref, field) {
+  try {
+    const t0 = Date.now();
+    await setDoc(ref, { [field]: serverTimestamp() }, { merge: true });
+    const t1 = Date.now();
+    const snap = await getDoc(ref);
+    const server = snap.get(field)?.toMillis?.();
+    if (server) clockOffset = server - (t0 + t1) / 2;
+  } catch { /* tetap pakai jam perangkat */ }
+  return clockOffset;
+}
 
 // ---------- DOM ----------
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -305,7 +336,7 @@ export function configWarning() {
 
 // ---------- Hapus room beserta isinya ----------
 export async function deleteRoomDeep(code) {
-  for (const sub of ["answers", "messages", "players"]) {
+  for (const sub of ["answers", "messages", "keys", "presence", "players"]) {
     const snap = await getDocs(collection(db, "rooms", code, sub));
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += 400) {
