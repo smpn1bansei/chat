@@ -1,5 +1,5 @@
 import {
-  auth, db, $, $$, esc, toast, initTheme, setLoading, friendlyError, configWarning, tsMillis, fmtDate,
+  auth, db, $, $$, esc, toast, initTheme, initFullscreen, setLoading, friendlyError, configWarning, tsMillis, fmtDate,
   fmtTimer, avatarHtml, confirmDialog, promptDialog, deleteRoomDeep, AppError, DEFAULT_SETTINGS
 } from "./common.js";
 import {
@@ -11,6 +11,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 initTheme();
+initFullscreen();
 configWarning();
 
 let me = null, teacher = null, rooms = [], filter = "all", unsubRooms = null;
@@ -67,6 +68,7 @@ function showLogin() {
   me = null;
   unsubRooms?.(); unsubRooms = null;
   $("#loginView").classList.remove("hidden");
+  $("#loginFooter").classList.remove("hidden");
   $("#dashView").classList.add("hidden");
   $("#logoutBtn").classList.add("hidden");
   $("#teacherChip").classList.add("hidden");
@@ -76,6 +78,7 @@ function showLogin() {
 async function showDashboard(user) {
   me = user;
   $("#loginView").classList.add("hidden");
+  $("#loginFooter").classList.add("hidden");
   $("#dashView").classList.remove("hidden");
   $("#logoutBtn").classList.remove("hidden");
 

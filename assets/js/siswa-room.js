@@ -1,12 +1,13 @@
 import {
-  auth, db, $, $$, esc, escMultiline, toast, initTheme, friendlyError, configWarning, tsMillis,
-  fmtClock, fmtCountdown, avatarHtml, rankPlayers, beep, celebrate, confirmDialog, AppError, DEFAULT_SETTINGS
+  auth, db, $, $$, esc, escMultiline, toast, initTheme, initFullscreen, friendlyError, configWarning, tsMillis,
+  fmtClock, fmtCountdown, avatarHtml, initials, avatarColor, rankPlayers, beep, celebrate, confirmDialog, AppError, DEFAULT_SETTINGS
 } from "./common.js";
 import {
   doc, collection, query, orderBy, onSnapshot, runTransaction, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 initTheme();
+initFullscreen();
 configWarning();
 
 const code = new URLSearchParams(location.search).get("room");
@@ -99,6 +100,10 @@ function start() {
     const prevScore = player?.score;
     player = snap.data();
     if (player.kicked) return fatal("🚫", "Kamu dikeluarkan", "Guru telah mengeluarkanmu dari room ini.");
+    $("#meName").textContent = player.name;
+    $("#meKelas").textContent = player.kelasLabel || "";
+    $("#meAvatar").textContent = initials(player.name);
+    $("#meAvatar").style.background = avatarColor(player.name);
     const chip = $("#myScore");
     chip.querySelector("span").textContent = player.score || 0;
     if (prevScore !== undefined && prevScore !== player.score) {

@@ -107,6 +107,23 @@ export function initTheme() {
   });
 }
 
+// ---------- Layar penuh ----------
+export function initFullscreen() {
+  const btns = $$("[data-fullscreen]");
+  if (!document.documentElement.requestFullscreen) { btns.forEach(b => b.classList.add("hidden")); return; }
+  const sync = () => btns.forEach(b => {
+    const on = !!document.fullscreenElement;
+    b.textContent = on ? "🗗" : "⛶";
+    b.title = on ? "Keluar layar penuh" : "Layar penuh";
+  });
+  btns.forEach(b => b.addEventListener("click", () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => toast("Browser menolak mode layar penuh.", "error"));
+  }));
+  document.addEventListener("fullscreenchange", sync);
+  sync();
+}
+
 // ---------- Toast ----------
 export function toast(msg, type = "info", ms = 3200) {
   let wrap = $("#toasts");

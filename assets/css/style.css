@@ -347,6 +347,11 @@ body.room-page { height: 100vh; height: 100dvh; overflow: hidden; }
 .room-badge .info b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; font-size: .92rem; }
 .room-badge .info span { font-size: .76rem; color: var(--muted); }
 
+.me-chip { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); min-width: 0; }
+.me-chip .avatar { width: 30px; height: 30px; font-size: .7rem; }
+.me-info { line-height: 1.15; min-width: 0; }
+.me-info b { display: block; font-size: .85rem; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me-info small { font-size: .72rem; color: var(--muted); font-weight: 600; }
 .score-chip {
   display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
   background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; font-weight: 800;
@@ -554,5 +559,19 @@ body.room-page { height: 100vh; height: 100dvh; overflow: hidden; }
   .welcome h1 { font-size: 1.3rem; }
   .toolbar .seg, .toolbar .search { width: 100%; max-width: none; }
   .room-badge .info { display: none; }
+  .me-chip { padding-right: 10px; }
+  .me-info b { max-width: 72px; }
+  .room-page .topbar { gap: 6px; padding: 8px 10px; }
+  .room-page .room-badge { padding: 3px; flex: none; }
+  .room-page .me-chip { flex: 0 1 auto; overflow: hidden; }
+  .room-page .topbar .spacer { display: none; }
+  .room-page .topbar-actions { flex: 1; min-width: 0; justify-content: flex-end; }
+  .room-page .topbar-actions > * { flex-shrink: 0; }
+  .room-page .topbar-actions > .me-chip { flex-shrink: 1; }
+  .room-page .score-chip { padding: 6px 10px; }
+  .room-page #leaveBtn { padding: 6px 9px; }
+  .me-info small { display: none; }
+  .room-page .topbar-actions { gap: 5px; }
+  .room-page .topbar .btn-icon { width: 34px; height: 34px; }
   .modal { padding: 20px 16px; }
 }

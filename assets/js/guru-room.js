@@ -1,5 +1,5 @@
 import {
-  auth, db, $, $$, esc, escMultiline, toast, initTheme, friendlyError, configWarning, tsMillis, fmtClock,
+  auth, db, $, $$, esc, escMultiline, toast, initTheme, initFullscreen, friendlyError, configWarning, tsMillis, fmtClock,
   fmtCountdown, fmtTimer, avatarHtml, rankPlayers, beep, confirmDialog, promptDialog, deleteRoomDeep,
   joinUrl, setLoading, ONLINE_WINDOW, DEFAULT_SETTINGS
 } from "./common.js";
@@ -9,6 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 initTheme();
+initFullscreen();
 configWarning();
 
 const code = new URLSearchParams(location.search).get("room");
