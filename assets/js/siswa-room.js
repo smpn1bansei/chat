@@ -150,9 +150,13 @@ function start() {
     renderComposer();
   }, onErr));
 
-  unsubs.push(onSnapshot(collection(db, "rooms", code, "players"), snap => {
-    players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // Papan skor: satu dokumen ringkasan yang diterbitkan HP guru tiap ±10 detik
+  // (bukan memantau data semua siswa → jauh lebih hemat kuota).
+  // Poin milik sendiri tetap langsung berubah lewat dokumen siswa di atas.
+  unsubs.push(onSnapshot(doc(db, "rooms", code, "board", "summary"), snap => {
+    players = snap.exists() ? (snap.data().entries || []) : [];
     renderLeaderboard();
+    if (room?.status === "ended" && !endedShown && player) showFinal();
   }, onErr));
 
   // Tanda online disimpan di koleksi terpisah (hanya dibaca guru) -> hemat kuota.
@@ -510,10 +514,10 @@ function renderLeaderboard() {
 
 // ---------- Hasil akhir ----------
 function showFinal() {
-  endedShown = true;
   const list = rankPlayers(players);
   const me = list.find(p => p.id === pid);
-  if (!me) return;
+  if (!me) return; // tunggu ringkasan papan skor terbaru
+  endedShown = true;
   const medal = me.rank === 1 ? "🥇" : me.rank === 2 ? "🥈" : me.rank === 3 ? "🥉" : "🎖️";
   if (me.rank <= 3) celebrate();
   const back = document.createElement("div");

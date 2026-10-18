@@ -110,6 +110,7 @@ rooms/{kode}/slots/{questionId}     responders[] (ID siswa), answerCount  (hanya
 rooms/{kode}/answers/{id}           questionId, playerId, uid, name, text, choice(PG), status(pending|correct|wrong), points, bonus
 rooms/{kode}/keys/{questionId}      correct  (kunci PG, hanya guru)
 rooms/{kode}/presence/{id_siswa}    lastSeen (tanda online, hanya dibaca guru)
+rooms/{kode}/board/summary          entries[] {id, name, kelasLabel, score} (papan skor untuk siswa)
 teachers/{uid}/bank/{id}            kind(text|mc), text, options[], correct, points, timer, tag
 ```
 
@@ -118,6 +119,7 @@ Siswa yang pindah perangkat harus mengisi **nama yang sama** dengan yang tercata
 ## 💰 Hemat kuota Firebase (paket gratis: 50.000 baca/hari)
 - Pilih **"Jawaban teman: Tidak terlihat"** (default). HP siswa hanya memuat jawabannya sendiri, jadi setiap jawaban baru hanya dibaca oleh pengirimnya dan guru, bukan oleh seluruh kelas.
 - Daftar penjawab tiap soal disimpan di koleksi `slots` yang tidak dipantau HP siswa, sehingga jawaban seorang siswa tidak memicu pembacaan di HP siswa lain. Jika slot "N tercepat" penuh, soal ditutup otomatis.
+- **Papan skor di HP siswa** berasal dari satu dokumen ringkasan (`board/summary`) yang diterbitkan HP guru paling sering tiap 10 detik, bukan dari data semua siswa. Poin milik siswa sendiri tetap berubah langsung.
 - **Tanda online siswa** bisa dimatikan di pengaturan room (default: mati). Saat mati, HP siswa tidak mengirim detak online sama sekali.
 - Hitung mundur memakai **jam server Firebase**, bukan jam HP, sehingga HP dengan jam yang salah tetap menampilkan sisa waktu yang benar.
 

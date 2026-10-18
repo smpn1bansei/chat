@@ -16,6 +16,8 @@ export const db = getFirestore(app);
 export const KELAS = ["7", "8", "9", "10", "11", "12"];
 export const ONLINE_WINDOW = 150 * 1000;
 export const HEARTBEAT_MS = 60 * 1000;
+/** Jeda minimal penerbitan ringkasan papan skor ke HP siswa */
+export const BOARD_MS = 10 * 1000;
 
 export const DEFAULT_SETTINGS = {
   answerMode: "single",   // "single" | "multiple"
@@ -337,7 +339,7 @@ export function configWarning() {
 
 // ---------- Hapus room beserta isinya ----------
 export async function deleteRoomDeep(code) {
-  for (const sub of ["answers", "slots", "messages", "keys", "presence", "players"]) {
+  for (const sub of ["answers", "slots", "messages", "keys", "presence", "board", "players"]) {
     const snap = await getDocs(collection(db, "rooms", code, sub));
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += 400) {

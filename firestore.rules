@@ -156,6 +156,13 @@ service cloud.firestore {
         allow update, delete: if isOwner();
       }
 
+      // ---------------- Ringkasan papan skor ----------------
+      // Diterbitkan HP guru secara berkala; HP siswa cukup memantau 1 dokumen ini.
+      match /board/{doc} {
+        allow read: if signedIn();
+        allow write: if isOwner();
+      }
+
       // ---------------- Kunci jawaban pilihan ganda ----------------
       // Hanya guru pemilik yang bisa membaca → siswa tidak bisa mengintip kunci.
       match /keys/{qid} {

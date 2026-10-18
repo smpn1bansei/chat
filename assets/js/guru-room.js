@@ -1,12 +1,12 @@
 import {
   auth, db, $, $$, esc, escMultiline, toast, initTheme, initFullscreen, initViewportHeight, friendlyError, configWarning, tsMillis, fmtClock,
   fmtCountdown, fmtTimer, avatarHtml, rankPlayers, beep, confirmDialog, promptDialog, deleteRoomDeep,
-  joinUrl, setLoading, serverNow, syncClock, ONLINE_WINDOW, DEFAULT_SETTINGS, LETTERS
+  joinUrl, setLoading, serverNow, syncClock, ONLINE_WINDOW, BOARD_MS, DEFAULT_SETTINGS, LETTERS
 } from "./common.js";
 import { listenBank, openBankEditor, saveBankItem, bankItemHtml, filterBank, optionEditor } from "./bank.js";
 import {
   doc, collection, query, orderBy, onSnapshot, getDoc, updateDoc, writeBatch, serverTimestamp,
-  increment, Timestamp
+  increment, Timestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 initTheme();
@@ -23,6 +23,7 @@ const msgRef = id => doc(db, "rooms", code, "messages", id);
 const ansRef = id => doc(db, "rooms", code, "answers", id);
 const keyRef = id => doc(db, "rooms", code, "keys", id);
 const slotRef = id => doc(db, "rooms", code, "slots", id);
+const boardRef = doc(db, "rooms", code, "board", "summary");
 const playerRef = id => doc(db, "rooms", code, "players", id);
 
 let me = null, room = null;
@@ -147,6 +148,7 @@ function start() {
     players = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
     renderLeaderboard();
     renderLiveStats();
+    scheduleBoard();
   }, err));
 
   // Tanda online siswa disimpan terpisah agar tidak memicu pembacaan di HP siswa lain
@@ -187,6 +189,30 @@ function closeFields(m) {
 }
 const openQuestions = (exceptId) => messages.filter(m => m.type === "question" && m.status === "open" && m.id !== exceptId);
 
+// ---------- Ringkasan papan skor untuk HP siswa ----------
+// HP siswa tidak memantau data semua siswa (setiap perubahan poin = dibaca 35 HP).
+// Guru menerbitkan SATU dokumen ringkasan, paling sering tiap BOARD_MS dan hanya bila berubah.
+let boardTimer = null, lastBoardSig = "", lastBoardAt = 0;
+function boardEntries() {
+  return rankPlayers(players).map(p => ({ id: p.id, name: p.name, kelasLabel: p.kelasLabel || "", score: p.score || 0 }));
+}
+function scheduleBoard() {
+  if (JSON.stringify(boardEntries()) === lastBoardSig) return;
+  clearTimeout(boardTimer);
+  boardTimer = setTimeout(publishBoard, Math.max(0, BOARD_MS - (Date.now() - lastBoardAt)));
+}
+async function publishBoard() {
+  clearTimeout(boardTimer);
+  const entries = boardEntries();
+  const sig = JSON.stringify(entries);
+  if (sig === lastBoardSig) return;
+  lastBoardAt = Date.now();
+  try {
+    await setDoc(boardRef, { entries, updatedAt: serverTimestamp() });
+    lastBoardSig = sig;
+  } catch (e) { console.warn("Gagal menerbitkan papan skor", e); }
+}
+
 // ---------- Header & kontrol ----------
 function renderHeader() {
   $("#roomName").textContent = room.name || `Room ${code}`;
@@ -221,6 +247,7 @@ $("#endBtn").onclick = async () => {
     if (!ok) return;
   }
   try {
+    if (room.status !== "ended") await publishBoard();
     const batch = writeBatch(db);
     if (room.status !== "ended") openQuestions().forEach(m => batch.update(msgRef(m.id), closeFields(m)));
     batch.update(roomRef, { status: room.status === "ended" ? "open" : "ended", updatedAt: serverTimestamp() });
