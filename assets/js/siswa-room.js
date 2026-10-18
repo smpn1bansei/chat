@@ -21,7 +21,8 @@ if (!/^\d{4}$/.test(code || "")) location.replace("index.html");
 const roomRef = doc(db, "rooms", code);
 const answersCol = collection(db, "rooms", code, "answers");
 
-let uid = null;
+let uid = null;   // akun perangkat (Firebase Anonymous)
+let pid = null;   // ID siswa di room = kelas + no. absen
 let room = null, player = null;
 let messages = [], answers = [], players = [];
 let sending = false, firstFeedRender = true;
@@ -67,7 +68,12 @@ if (!auth.currentUser) {
   location.replace(`index.html?room=${code}`);
 } else {
   uid = auth.currentUser.uid;
-  start();
+  pid = new URLSearchParams(location.search).get("p") || localStorage.getItem(`educhat_pid_${code}`);
+  if (!pid) location.replace(`index.html?room=${code}`);
+  else {
+    try { localStorage.setItem(`educhat_pid_${code}`, pid); } catch { /* abaikan */ }
+    start();
+  }
 }
 
 function fatal(icon, title, msg) {
@@ -77,7 +83,7 @@ function fatal(icon, title, msg) {
       <div class="big">${icon}</div>
       <h2 style="margin-bottom:6px">${esc(title)}</h2>
       <p class="muted">${esc(msg)}</p>
-      <a class="btn btn-primary btn-block" href="index.html">Kembali ke halaman awal</a>
+      <a class="btn btn-primary btn-block" href="index.html?room=${code}">Kembali ke halaman awal</a>
     </div>`;
   $("#loading").classList.remove("hidden");
 }
@@ -100,11 +106,15 @@ function start() {
     if (room.status === "ended" && !endedShown && player) showFinal();
   }, onErr));
 
-  unsubs.push(onSnapshot(doc(db, "rooms", code, "players", uid), snap => {
+  unsubs.push(onSnapshot(doc(db, "rooms", code, "players", pid), snap => {
     if (!snap.exists()) { location.replace(`index.html?room=${code}`); return; }
     const prevScore = player?.score;
     player = snap.data();
     if (player.kicked) return fatal("🚫", "Kamu dikeluarkan", "Guru telah mengeluarkanmu dari room ini.");
+    if (player.uid !== uid) {
+      return fatal("📱", "Akunmu dibuka di perangkat lain",
+        `${player.name} (${player.kelasLabel || ""}) baru saja masuk dari perangkat lain. Untuk melanjutkan di sini, masuk lagi dengan nama, kelas, dan no. absen yang sama.`);
+    }
     $("#meName").textContent = player.name;
     $("#meKelas").textContent = player.kelasLabel || "";
     const chip = $("#myScore");
@@ -139,7 +149,7 @@ function start() {
   unsubs.push(onSnapshot(query(answersCol, orderBy("createdAt")), snap => {
     answers = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
     for (const a of answers) {
-      if (a.uid !== uid) continue;
+      if (a.playerId !== pid) continue;
       const prev = myStatuses.get(a.id);
       myStatuses.set(a.id, a.status);
       if (!ansReady || prev === undefined || prev === a.status) continue;
@@ -163,7 +173,7 @@ function start() {
   // detak keberadaan (online)
   setInterval(() => {
     if (document.visibilityState === "visible" && player && !player.kicked) {
-      updateDoc(doc(db, "rooms", code, "players", uid), { lastSeen: serverTimestamp() }).catch(() => {});
+      updateDoc(doc(db, "rooms", code, "players", pid), { lastSeen: serverTimestamp() }).catch(() => {});
     }
   }, 30000);
 
@@ -204,7 +214,7 @@ function statusBadge(m) {
 }
 
 function answerBubble(a) {
-  const mine = a.uid === uid;
+  const mine = a.playerId === pid;
   const st = a.status === "correct" ? `✓ Benar +${a.points}` : a.status === "wrong" ? "✗ Salah" : "⏳ Menunggu penilaian";
   const cls = a.status === "correct" ? "correct" : a.status === "wrong" ? "wrong" : "";
   if (mine) {
@@ -280,7 +290,7 @@ function renderFeed() {
     const showOthers = s.showAnswers === "always" || m.status !== "open";
     let hidden = 0;
     for (const a of list) {
-      if (a.uid === uid || showOthers) html += answerBubble(a);
+      if (a.playerId === pid || showOthers) html += answerBubble(a);
       else hidden++;
     }
     if (hidden) html += `<div class="hidden-note">🙈 ${hidden} jawaban teman disembunyikan sampai pertanyaan ditutup</div>`;
@@ -301,7 +311,7 @@ function composerState() {
   const dl = tsMillis(q.deadline);
   if (dl && dl <= Date.now()) return { ok: false, q, msg: "⏰ Waktu menjawab sudah habis." };
   const resp = q.responders || [];
-  const inR = resp.includes(uid);
+  const inR = resp.includes(pid);
   if (s.answerMode === "single" && inR) return { ok: false, q, msg: "✅ Jawabanmu sudah terkirim. Tunggu penilaian guru." };
   if (!inR && s.maxFastest > 0 && resp.length >= s.maxFastest) {
     return { ok: false, q, msg: `🚫 Slot penuh — ${s.maxFastest} siswa tercepat sudah menjawab.` };
@@ -369,14 +379,14 @@ async function sendAnswer() {
       if (qd.status !== "open") throw new AppError("Pertanyaan sudah ditutup guru.");
       if (qd.deadline && tsMillis(qd.deadline) <= Date.now()) throw new AppError("Waktu menjawab sudah habis.");
       const resp = qd.responders || [];
-      const inR = resp.includes(uid);
+      const inR = resp.includes(pid);
       if (s.answerMode === "single" && inR) throw new AppError("Kamu sudah menjawab pertanyaan ini.");
       if (!inR && s.maxFastest > 0 && resp.length >= s.maxFastest) throw new AppError("Yah, slot jawaban sudah penuh! Lebih cepat lagi ya ⚡");
 
-      const aRef = s.answerMode === "single" ? doc(answersCol, `${q.id}_${uid}`) : doc(answersCol);
-      tx.update(qRef, { responders: inR ? resp : [...resp, uid], answerCount: (qd.answerCount || 0) + 1 });
+      const aRef = s.answerMode === "single" ? doc(answersCol, `${q.id}_${pid}`) : doc(answersCol);
+      tx.update(qRef, { responders: inR ? resp : [...resp, pid], answerCount: (qd.answerCount || 0) + 1, lastResponder: pid });
       tx.set(aRef, {
-        questionId: q.id, uid, name: player.name, kelasLabel: player.kelasLabel || "",
+        questionId: q.id, playerId: pid, uid, name: player.name, kelasLabel: player.kelasLabel || "",
         text, status: "pending", points: 0, createdAt: serverTimestamp()
       });
     });
@@ -397,7 +407,7 @@ function renderLeaderboard() {
   const list = rankPlayers(players);
   $("#playerCount").textContent = `${list.length} siswa`;
 
-  const me = list.find(p => p.id === uid);
+  const me = list.find(p => p.id === pid);
   $("#myRank").innerHTML = me ? `
     <div><div class="muted" style="font-size:.8rem;font-weight:700">Peringkatmu</div><div class="r">#${me.rank} <small class="muted" style="font-size:.85rem">dari ${list.length}</small></div></div>
     <div style="text-align:right"><div class="muted" style="font-size:.8rem;font-weight:700">Poin</div><div class="r">${me.score || 0}</div></div>` : "";
@@ -407,7 +417,7 @@ function renderLeaderboard() {
   $("#podium").innerHTML = pod.map((p, i) => p ? `
     <div class="pod ${cls[i]}">
       ${avatarHtml(p.name)}
-      <div class="nm" title="${esc(p.name)}">${esc(p.name)}${p.id === uid ? " (kamu)" : ""}</div>
+      <div class="nm" title="${esc(p.name)}">${esc(p.name)}${p.id === pid ? " (kamu)" : ""}</div>
       <div class="pts">${p.score || 0} poin</div>
       <div class="block">${nums[i] === 1 ? "👑" : nums[i]}</div>
     </div>` : `
@@ -415,10 +425,10 @@ function renderLeaderboard() {
 
   const rest = list.slice(3);
   $("#lbList").innerHTML = rest.length ? rest.map(p => `
-    <div class="lb-item ${p.id === uid ? "me" : ""}">
+    <div class="lb-item ${p.id === pid ? "me" : ""}">
       <span class="lb-rank">${p.rank}</span>
       ${avatarHtml(p.name)}
-      <div class="lb-name"><b>${esc(p.name)}${p.id === uid ? " (kamu)" : ""}</b><span>${esc(p.kelasLabel || "")}</span></div>
+      <div class="lb-name"><b>${esc(p.name)}${p.id === pid ? " (kamu)" : ""}</b><span>${esc(p.kelasLabel || "")}</span></div>
       <span class="lb-score">${p.score || 0}</span>
     </div>`).join("") : (list.length <= 3 ? `<p class="muted" style="text-align:center;font-size:.85rem">Ajak teman lain untuk bergabung! 🙌</p>` : "");
 }
@@ -427,7 +437,7 @@ function renderLeaderboard() {
 function showFinal() {
   endedShown = true;
   const list = rankPlayers(players);
-  const me = list.find(p => p.id === uid);
+  const me = list.find(p => p.id === pid);
   if (!me) return;
   const medal = me.rank === 1 ? "🥇" : me.rank === 2 ? "🥈" : me.rank === 3 ? "🥉" : "🎖️";
   if (me.rank <= 3) celebrate();

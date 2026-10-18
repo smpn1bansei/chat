@@ -175,10 +175,10 @@ $("#exportBtn").onclick = () => {
   const list = rankPlayers(players);
   if (!list.length) return toast("Belum ada siswa di room ini.", "error");
   const qCount = messages.filter(m => m.type === "question").length;
-  const rows = [["Peringkat", "Nama", "Kelas", "Poin", "Jawaban Benar", "Jawaban Salah", "Total Jawaban", "Jumlah Pertanyaan"]];
+  const rows = [["Peringkat", "Nama", "Kelas", "No. Absen", "Poin", "Jawaban Benar", "Jawaban Salah", "Total Jawaban", "Jumlah Pertanyaan"]];
   for (const p of list) {
-    const mine = answers.filter(a => a.uid === p.id);
-    rows.push([p.rank, p.name, p.kelasLabel || "", p.score || 0,
+    const mine = answers.filter(a => a.playerId === p.id);
+    rows.push([p.rank, p.name, p.kelas || "", p.absen ?? "", p.score || 0,
       mine.filter(a => a.status === "correct").length, mine.filter(a => a.status === "wrong").length, mine.length, qCount]);
   }
   const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
@@ -322,8 +322,8 @@ function questionCard(m, list) {
   const ans = list.map((a, i) => {
     const secs = startMs && tsMillis(a.createdAt) ? ((tsMillis(a.createdAt) - startMs) / 1000).toFixed(1) : "-";
     const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`;
-    const already = a.status !== "correct" && correctUids.has(a.uid);
-    if (a.status === "correct") correctUids.add(a.uid);
+    const already = a.status !== "correct" && correctUids.has(a.playerId);
+    if (a.status === "correct") correctUids.add(a.playerId);
     return `<div class="ans ${a.status}" data-ans="${a.id}" title="Klik untuk menandai benar/salah">
       <span class="ans-rank">${medal}</span>
       ${avatarHtml(a.name)}
@@ -428,7 +428,7 @@ async function grade(a, newStatus) {
   const delta = newPts - oldPts;
   const batch = writeBatch(db);
   batch.update(ansRef(a.id), { status: newStatus, points: newPts, gradedAt: serverTimestamp() });
-  if (delta) batch.update(playerRef(a.uid), { score: increment(delta) });
+  if (delta) batch.update(playerRef(a.playerId), { score: increment(delta) });
   try {
     await batch.commit();
     if (newStatus === "correct") beep("correct");
@@ -461,7 +461,7 @@ async function questionAction(act, id) {
       batch.update(msgRef(id), { points: pts });
       for (const a of answers.filter(x => x.questionId === id && x.status === "correct")) {
         batch.update(ansRef(a.id), { points: pts });
-        if (pts !== a.points) batch.update(playerRef(a.uid), { score: increment(pts - (a.points || 0)) });
+        if (pts !== a.points) batch.update(playerRef(a.playerId), { score: increment(pts - (a.points || 0)) });
       }
       await batch.commit();
       toast("Poin diperbarui.", "success");
@@ -478,9 +478,9 @@ async function questionAction(act, id) {
       const scoreBack = {};
       for (const a of list) {
         ops.push(b => b.delete(ansRef(a.id)));
-        if (a.status === "correct") scoreBack[a.uid] = (scoreBack[a.uid] || 0) + (a.points || 0);
+        if (a.status === "correct") scoreBack[a.playerId] = (scoreBack[a.playerId] || 0) + (a.points || 0);
       }
-      for (const [uid, pts] of Object.entries(scoreBack)) ops.push(b => b.update(playerRef(uid), { score: increment(-pts) }));
+      for (const [pid, pts] of Object.entries(scoreBack)) ops.push(b => b.update(playerRef(pid), { score: increment(-pts) }));
       ops.push(b => b.delete(msgRef(id)));
       for (let i = 0; i < ops.length; i += 450) {
         const batch = writeBatch(db);

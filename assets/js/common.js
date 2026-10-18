@@ -68,7 +68,17 @@ export function fmtTimer(sec) {
 }
 
 // ---------- Identitas ----------
-export const kelasLabel = (kelas, rombel) => `${kelas} ${rombel || ""}`.trim();
+/** "  ix-ips 1 " → "IX-IPS 1" */
+export const normKelas = s => String(s || "").trim().replace(/\s+/g, " ").toUpperCase();
+/** Nama untuk dibandingkan: huruf kecil, spasi dirapikan */
+export const normName = s => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+export const kelasLabel = (kelas, absen) => `${kelas} · No. ${absen}`;
+/**
+ * ID siswa di dalam room = kelas + no. absen (mis. "7-1__5", "IX-IPS1__12").
+ * Inilah kunci yang membuat poin tetap sama walau siswa ganti perangkat.
+ */
+export const playerKey = (kelas, absen) =>
+  `${normKelas(kelas).replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "X"}__${Number(absen)}`;
 export function initials(name) {
   const parts = String(name || "?").trim().split(/\s+/);
   return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "?";

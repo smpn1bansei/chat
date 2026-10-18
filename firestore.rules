@@ -44,45 +44,65 @@ service cloud.firestore {
         && request.resource.data.code == resource.data.code;
       allow delete: if isTeacher() && resource.data.ownerUid == request.auth.uid;
 
+      // Siswa (pid) dimiliki oleh perangkat yang uid-nya tercatat di dokumen siswa
+      function ownsPlayer(pid) {
+        return exists(playerPath(pid))
+          && get(playerPath(pid)).data.uid == request.auth.uid
+          && get(playerPath(pid)).data.kicked == false;
+      }
+
       // ---------------- Peserta ----------------
-      match /players/{uid} {
+      // ID dokumen = kelas + no. absen, mis. "7-1__5". Field uid = perangkat yang sedang dipakai.
+      match /players/{pid} {
         allow read: if signedIn();
         allow create: if signedIn()
-          && request.auth.uid == uid
+          && pid.matches('^[A-Z0-9-]{1,20}__[0-9]{1,3}$')
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.absen is int
+          && pid.split('__')[1] == string(request.resource.data.absen)
           && request.resource.data.score == 0
           && request.resource.data.kicked == false
           && request.resource.data.name is string
           && request.resource.data.name.size() <= 40
           && roomData().status == 'open';
-        // Siswa hanya boleh memperbarui profil & tanda online — bukan poin.
+        // Siswa tidak pernah boleh mengubah poin.
         allow update: if isOwner()
-          || (signedIn() && request.auth.uid == uid
-              && resource.data.kicked == false
-              && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(['name', 'kelas', 'rombel', 'kelasLabel', 'lastSeen']));
+          || (signedIn() && resource.data.kicked == false && (
+               // perangkat yang sama: perbarui nama / tanda online
+               (resource.data.uid == request.auth.uid
+                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'lastSeen'])
+                 && request.resource.data.name is string
+                 && request.resource.data.name.size() <= 40)
+               // pindah perangkat: hanya uid & tanda online yang berubah
+               || (request.resource.data.uid == request.auth.uid
+                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'lastSeen']))
+             ));
         allow delete: if isOwner();
       }
 
       // ---------------- Pertanyaan & pengumuman ----------------
       match /messages/{mid} {
-        // Siswa boleh "mengambil slot" menjawab: menambah uid ke responders
+        // Siswa boleh "mengambil slot" menjawab: menambah ID siswa (pid) ke responders
         // dan menaikkan answerCount, sesuai mode & batas penjawab tercepat.
         function studentTakesSlot() {
           let s = roomData().settings;
           let before = resource.data.responders;
           let after = request.resource.data.responders;
+          let pid = request.resource.data.lastResponder;
           return signedIn()
+            && pid is string
+            && ownsPlayer(pid)
             && roomData().status != 'ended'
             && resource.data.type == 'question'
             && resource.data.status == 'open'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responders', 'answerCount'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responders', 'answerCount', 'lastResponder'])
             && request.resource.data.answerCount == resource.data.answerCount + 1
             && (after == before
                 || (after.size() == before.size() + 1
                     && after.hasAll(before)
-                    && request.auth.uid in after
-                    && !(request.auth.uid in before)))
-            && (s.answerMode != 'single' || !(request.auth.uid in before))
+                    && pid in after
+                    && !(pid in before)))
+            && (s.answerMode != 'single' || !(pid in before))
             && (s.maxFastest == 0 || after.size() <= s.maxFastest)
             && (resource.data.deadline == null || request.time < resource.data.deadline);
         }
@@ -97,11 +117,12 @@ service cloud.firestore {
         function canAnswer() {
           let q = getAfter(/databases/$(database)/documents/rooms/$(code)/messages/$(request.resource.data.questionId)).data;
           let s = roomData().settings;
-          return exists(playerPath(request.auth.uid))
-            && get(playerPath(request.auth.uid)).data.kicked == false
+          let pid = request.resource.data.playerId;
+          return pid is string
+            && ownsPlayer(pid)
             && q.status == 'open'
-            && request.auth.uid in q.responders
-            && (s.answerMode != 'single' || aid == request.resource.data.questionId + '_' + request.auth.uid);
+            && pid in q.responders
+            && (s.answerMode != 'single' || aid == request.resource.data.questionId + '_' + pid);
         }
 
         allow read: if signedIn();

@@ -9,13 +9,14 @@ Educhat adalah aplikasi kuis berbentuk ruang chat untuk **siswa** dan **guru**, 
 ## ✨ Fitur
 
 ### Siswa (`index.html` → `kelas.html`)
-- Masuk dengan **Nama**, **Kelas** (7–12), **Rombel** (misal `IPA 1`), dan **Kode Room 4 digit**. Tidak perlu akun.
+- Masuk dengan **Nama**, **Kelas** (teks bebas, misal `7.1`, `10.2`, `IX-IPS1`), **No. Absen**, dan **Kode Room 4 digit**. Tidak perlu akun.
+- **Kelas + no. absen adalah identitas siswa di dalam room.** Jika HP rusak/ganti perangkat, cukup masuk lagi dengan nama, kelas, dan no. absen yang sama — poin tetap utuh. Perangkat lama otomatis keluar.
 - Tampilan chat: pertanyaan guru muncul sebagai gelembung chat, siswa langsung membalas.
 - Hitung mundur timer, info slot "N tercepat", status jawaban (menunggu / benar / salah).
 - Notifikasi suara + konfeti saat jawaban dinilai **benar**.
 - **Papan skor live** dengan podium juara 1–3 dan peringkat pribadi.
 - Layar hasil akhir (peringkat & poin) saat guru mengakhiri permainan.
-- Bisa masuk lagi dengan kode yang sama tanpa kehilangan poin. Link `index.html?room=1234` (dari QR) langsung mengisi kode.
+- Link `index.html?room=1234` (dari QR) langsung mengisi kode.
 
 ### Guru (`guru.html` → `guru-room.html`)
 - Login **email & password**, ada fitur lupa password.
@@ -97,11 +98,14 @@ firebase.json       Konfigurasi Firebase Hosting & Rules
 ```
 teachers/{uid}                      displayName, email
 rooms/{kode4digit}                  code, name, ownerUid, ownerName, status(open|locked|ended), settings{...}
-rooms/{kode}/players/{uid}          name, kelas, rombel, kelasLabel, score, kicked, lastSeen
+rooms/{kode}/players/{kelas__absen} name, kelas, absen, kelasLabel, uid(perangkat aktif), score, kicked, lastSeen
+                                    contoh ID: "7-1__5", "IX-IPS1__12"
 rooms/{kode}/messages/{id}          type(question|info), number, text, points, status(open|closed),
-                                    deadline, responders[], answerCount
-rooms/{kode}/answers/{id}           questionId, uid, name, text, status(pending|correct|wrong), points
+                                    deadline, responders[] (ID siswa), answerCount
+rooms/{kode}/answers/{id}           questionId, playerId, uid, name, text, status(pending|correct|wrong), points
 ```
+
+Siswa yang pindah perangkat harus mengisi **nama yang sama** dengan yang tercatat; jika nama berbeda, no. absen dianggap sudah dipakai orang lain. Guru tetap bisa mengeluarkan siswa yang menyamar.
 
 Aturan mode jawaban dan batas "N tercepat" tidak hanya dicek di aplikasi, tapi juga di **Firestore Rules**. Siswa mengambil slot dalam satu transaksi, jadi batas tetap berlaku walau banyak siswa mengirim di detik yang sama.
 

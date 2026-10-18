@@ -152,6 +152,7 @@ h1, h2, h3, h4 { margin: 0; line-height: 1.25; }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .field > span { font-weight: 700; font-size: .85rem; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-row-kelas { grid-template-columns: 1.4fr 1fr; }
 .hint { font-size: .8rem; color: var(--muted); margin: -6px 0 12px; }
 input, select, textarea {
   font: inherit; color: var(--text); background: var(--surface-2);
@@ -553,6 +554,7 @@ body.room-page { height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); mi
   .brand .brand-text { display: none; }
   .hide-sm { display: none !important; }
   .field-row, .settings-grid { grid-template-columns: 1fr; }
+  .field-row.field-row-kelas { grid-template-columns: 1.4fr 1fr; }
   .kelas-pills span { height: 38px; }
   .card { padding: 18px; }
   .join-card { padding: 22px 18px; }

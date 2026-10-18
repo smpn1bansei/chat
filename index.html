@@ -31,7 +31,7 @@
       <h1>Jawab cepat, <span class="grad">raih poin</span>, jadi juara kelas!</h1>
       <p class="lead">Educhat adalah ruang chat kuis interaktif. Guru melempar pertanyaan, kamu menjawab secepat kilat, dan papan skor ter-update secara langsung.</p>
       <div class="steps">
-        <div class="step"><div class="step-num">1</div><div><b>Masukkan identitas</b><span>Tulis nama lengkap dan pilih kelasmu.</span></div></div>
+        <div class="step"><div class="step-num">1</div><div><b>Masukkan identitas</b><span>Tulis nama lengkap, kelas, dan nomor absenmu.</span></div></div>
         <div class="step"><div class="step-num">2</div><div><b>Ketik kode room</b><span>4 digit kode yang diberikan oleh gurumu.</span></div></div>
         <div class="step"><div class="step-num">3</div><div><b>Jawab &amp; kumpulkan poin</b><span>Jawaban benar dari guru = poin di papan skor.</span></div></div>
       </div>
@@ -46,15 +46,17 @@
           <input id="name" maxlength="40" placeholder="cth. Budi Santoso" required>
         </label>
 
-        <div class="field">
-          <span>Kelas</span>
-          <div class="kelas-pills" id="kelasPills"></div>
+        <div class="field-row field-row-kelas">
+          <label class="field">
+            <span>Kelas</span>
+            <input id="kelas" maxlength="15" placeholder="cth. 7.1, IX-IPS1" required autocapitalize="characters">
+          </label>
+          <label class="field">
+            <span>No. Absen</span>
+            <input id="absen" type="number" inputmode="numeric" min="1" max="999" placeholder="cth. 5" required>
+          </label>
         </div>
-
-        <label class="field">
-          <span>Rombel / Jurusan</span>
-          <input id="rombel" maxlength="20" placeholder="cth. IPA 1, A, TKJ 2" required>
-        </label>
+        <p class="hint">💡 Ingat <b>kelas</b> &amp; <b>no. absen</b>-mu. Jika ganti HP/laptop, masuk lagi dengan nama, kelas, dan no. absen yang sama — poinmu tetap aman.</p>
 
         <label class="field">
           <span>Kode Room</span>
