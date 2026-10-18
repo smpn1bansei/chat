@@ -419,9 +419,7 @@ function autosize() {
   input.style.height = Math.min(input.scrollHeight, 140) + "px";
 }
 input.addEventListener("input", () => { autosize(); sendBtn.disabled = input.disabled || !input.value.trim(); });
-input.addEventListener("blur", () => document.body.classList.remove("typing"));
 input.addEventListener("focus", () => setTimeout(() => {
-  document.body.classList.add("typing");
   feed.scrollTop = feed.scrollHeight;
   $("#composer").scrollIntoView({ block: "end" });
 }, 300));
@@ -478,6 +476,7 @@ async function sendAnswer({ choice = null } = {}) {
     sending = false;
     renderComposer();
     if (!input.disabled) input.focus();
+    else input.blur(); // tutup keyboard HP bila sudah tidak bisa menjawab lagi
   }
 }
 

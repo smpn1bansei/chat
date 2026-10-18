@@ -154,13 +154,19 @@ export function initTheme() {
 // ---------- Tinggi layar nyata (address bar & keyboard HP) ----------
 export function initViewportHeight(onResize) {
   const vv = window.visualViewport;
+  let fullH = 0; // tinggi layar tanpa keyboard (tertinggi yang pernah terlihat)
+  window.addEventListener("orientationchange", () => { fullH = 0; });
   const apply = () => {
     const h = vv ? vv.height : window.innerHeight;
+    fullH = Math.max(fullH, h);
     document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
+    // keyboard dianggap terbuka bila layar terlihat menyusut > 150px
+    document.documentElement.classList.toggle("kb-open", fullH - h > 150);
     if (vv) window.scrollTo(0, 0);
     onResize?.();
   };
-  (vv || window).addEventListener("resize", apply);
+  if (vv) vv.addEventListener("resize", apply);
+  window.addEventListener("resize", apply);
   if (vv) vv.addEventListener("scroll", () => window.scrollTo(0, 0));
   window.addEventListener("orientationchange", () => setTimeout(apply, 300));
   apply();

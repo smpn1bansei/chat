@@ -528,7 +528,7 @@ body.room-page { height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); mi
 
   body.room-page, body.room-page.teacher-page { height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); overflow: hidden; position: fixed; inset: 0 0 auto 0; width: 100%; }
   .mobile-tabs { padding-bottom: calc(6px + env(safe-area-inset-bottom)); flex: none; }
-  body.typing .mobile-tabs { display: none; }
+  html.kb-open .mobile-tabs { display: none; }
   .room-layout.student, .room-layout.teacher { grid-template-columns: 1fr; padding: 10px 10px 0; gap: 0; }
   .room-layout .tab-pane { display: none !important; }
   .room-layout .tab-pane.show { display: flex !important; }
