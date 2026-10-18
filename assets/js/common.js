@@ -14,8 +14,8 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 export const KELAS = ["7", "8", "9", "10", "11", "12"];
-export const ONLINE_WINDOW = 100 * 1000;
-export const HEARTBEAT_MS = 45 * 1000;
+export const ONLINE_WINDOW = 150 * 1000;
+export const HEARTBEAT_MS = 60 * 1000;
 
 export const DEFAULT_SETTINGS = {
   answerMode: "single",   // "single" | "multiple"
@@ -25,7 +25,8 @@ export const DEFAULT_SETTINGS = {
   defaultTimer: 0,        // detik, 0 = tanpa batas waktu
   bonus1: 0,              // bonus poin penjawab benar tercepat #1
   bonus2: 0,              // #2
-  bonus3: 0               // #3
+  bonus3: 0,              // #3
+  trackOnline: false      // tanda online siswa (mati = lebih hemat kuota)
 };
 
 export const SHOW_ANSWERS_LABEL = {
@@ -336,7 +337,7 @@ export function configWarning() {
 
 // ---------- Hapus room beserta isinya ----------
 export async function deleteRoomDeep(code) {
-  for (const sub of ["answers", "messages", "keys", "presence", "players"]) {
+  for (const sub of ["answers", "slots", "messages", "keys", "presence", "players"]) {
     const snap = await getDocs(collection(db, "rooms", code, sub));
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += 400) {

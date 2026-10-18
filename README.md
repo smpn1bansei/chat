@@ -105,7 +105,8 @@ rooms/{kode4digit}                  code, name, ownerUid, ownerName, status(open
 rooms/{kode}/players/{kelas__absen} name, kelas, absen, kelasLabel, uid(perangkat aktif), score, kicked, lastSeen
                                     contoh ID: "7-1__5", "IX-IPS1__12"
 rooms/{kode}/messages/{id}          type(question|info), number, text, points, status(open|closed),
-                                    deadline, responders[] (ID siswa), answerCount
+                                    deadline, options[] & reveal (PG)
+rooms/{kode}/slots/{questionId}     responders[] (ID siswa), answerCount  (hanya dipantau guru)
 rooms/{kode}/answers/{id}           questionId, playerId, uid, name, text, choice(PG), status(pending|correct|wrong), points, bonus
 rooms/{kode}/keys/{questionId}      correct  (kunci PG, hanya guru)
 rooms/{kode}/presence/{id_siswa}    lastSeen (tanda online, hanya dibaca guru)
@@ -116,7 +117,8 @@ Siswa yang pindah perangkat harus mengisi **nama yang sama** dengan yang tercata
 
 ## 💰 Hemat kuota Firebase (paket gratis: 50.000 baca/hari)
 - Pilih **"Jawaban teman: Tidak terlihat"** (default). HP siswa hanya memuat jawabannya sendiri, jadi setiap jawaban baru hanya dibaca oleh pengirimnya dan guru, bukan oleh seluruh kelas.
-- Tanda online siswa disimpan di koleksi `presence` yang hanya dibaca guru, sehingga detak online tidak membebani HP siswa lain.
+- Daftar penjawab tiap soal disimpan di koleksi `slots` yang tidak dipantau HP siswa, sehingga jawaban seorang siswa tidak memicu pembacaan di HP siswa lain. Jika slot "N tercepat" penuh, soal ditutup otomatis.
+- **Tanda online siswa** bisa dimatikan di pengaturan room (default: mati). Saat mati, HP siswa tidak mengirim detak online sama sekali.
 - Hitung mundur memakai **jam server Firebase**, bukan jam HP, sehingga HP dengan jam yang salah tetap menampilkan sisa waktu yang benar.
 
 Aturan mode jawaban dan batas "N tercepat" tidak hanya dicek di aplikasi, tapi juga di **Firestore Rules**. Siswa mengambil slot dalam satu transaksi, jadi batas tetap berlaku walau banyak siswa mengirim di detik yang sama.

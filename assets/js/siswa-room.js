@@ -160,6 +160,7 @@ function start() {
   const presRef = doc(db, "rooms", code, "presence", pid);
   syncClock(presRef, "lastSeen");
   setInterval(() => {
+    if (!settings().trackOnline) return; // tanda online dimatikan guru → tidak ada penulisan
     if (document.visibilityState === "visible" && player && !player.kicked && player.uid === uid) {
       setDoc(presRef, { lastSeen: serverTimestamp() }).catch(() => {});
     }
@@ -255,7 +256,6 @@ function answerBubble(a) {
 function questionBubble(m) {
   const s = settings();
   const active = activeQuestion()?.id === m.id;
-  const resp = (m.responders || []).length;
   const dl = tsMillis(m.deadline), startMs = tsMillis(m.createdAt);
   const now = serverNow();
   const running = dl && m.status === "open" && dl > now;
@@ -263,9 +263,7 @@ function questionBubble(m) {
       <span>⏱ <b data-deadline="${dl}">${fmtCountdown((dl - now) / 1000)}</b></span>` : "";
   const bar = running ? `
       <div class="timebar"><i data-bar-start="${startMs}" data-bar-end="${dl}" style="width:${barPct(startMs, dl)}%"></i></div>` : "";
-  const slots = m.status === "open" && s.maxFastest > 0
-    ? `<span>👥 ${Math.min(resp, s.maxFastest)}/${s.maxFastest} slot</span>`
-    : `<span>💬 ${resp} siswa menjawab</span>`;
+  const slots = m.status === "open" && s.maxFastest > 0 ? `<span>⚡ ${s.maxFastest} penjawab tercepat</span>` : "";
   return `<div class="msg msg-other">
     <span class="avatar avatar-teacher">👩‍🏫</span>
     <div class="bubble q-bubble ${active ? "active" : ""}">
@@ -326,8 +324,6 @@ function renderFeed() {
     const list = byQ[m.id] || [];
     if (s.showAnswers === "never") {
       for (const a of list) if (a.playerId === pid) html += answerBubble(a);
-      const others = (m.responders || []).filter(x => x !== pid).length;
-      if (others) html += `<div class="hidden-note">🙈 ${others} teman sudah menjawab · jawaban teman tidak ditampilkan</div>`;
       continue;
     }
     const showOthers = s.showAnswers === "always" || m.status !== "open";
@@ -354,15 +350,14 @@ function composerState() {
   const mc = q.kind === "mc";
   const dl = tsMillis(q.deadline);
   if (dl && dl <= serverNow()) return { ok: false, q, msg: "⏰ Waktu menjawab sudah habis." };
-  const resp = q.responders || [];
-  const inR = resp.includes(pid);
+  // sudah menjawab? → dilihat dari jawaban sendiri (data slot tidak dipantau siswa)
+  const inR = answers.some(a => a.questionId === q.id && a.playerId === pid);
   if ((s.answerMode === "single" || mc) && inR) {
     return { ok: false, q, msg: mc ? "✅ Pilihanmu sudah terkirim & dinilai otomatis." : "✅ Jawabanmu sudah terkirim. Tunggu penilaian guru." };
   }
-  if (!inR && s.maxFastest > 0 && resp.length >= s.maxFastest) {
-    return { ok: false, q, msg: `🚫 Slot penuh — ${s.maxFastest} siswa tercepat sudah menjawab.` };
-  }
-  const left = s.maxFastest > 0 && !inR ? ` · sisa ${s.maxFastest - resp.length} slot` : "";
+  // Slot penuh tidak dipantau siswa: guru menutup pertanyaan otomatis saat penuh,
+  // dan transaksi menolak jawaban yang terlambat.
+  const left = s.maxFastest > 0 && !inR ? ` · hanya ${s.maxFastest} tercepat!` : "";
   return {
     ok: true, q, mc,
     msg: (mc ? "👇 Ketuk satu pilihan jawaban (hanya 1 kali)" :
@@ -445,8 +440,10 @@ async function sendAnswer({ choice = null } = {}) {
   try {
     await runTransaction(db, async tx => {
       const qRef = doc(db, "rooms", code, "messages", q.id);
+      const sRef = doc(db, "rooms", code, "slots", q.id);
       const rs = await tx.get(roomRef);
       const qs = await tx.get(qRef);
+      const ss = await tx.get(sRef);
       if (!rs.exists()) throw new AppError("Room sudah dihapus.");
       if (!qs.exists()) throw new AppError("Pertanyaan sudah dihapus guru.");
       const r = rs.data(), qd = qs.data();
@@ -454,14 +451,15 @@ async function sendAnswer({ choice = null } = {}) {
       if (r.status === "ended") throw new AppError("Room sudah berakhir.");
       if (qd.status !== "open") throw new AppError("Pertanyaan sudah ditutup guru.");
       if (qd.deadline && tsMillis(qd.deadline) <= serverNow()) throw new AppError("Waktu menjawab sudah habis.");
-      const resp = qd.responders || [];
+      const sd = ss.exists() ? ss.data() : { responders: [], answerCount: 0 };
+      const resp = sd.responders || [];
       const inR = resp.includes(pid);
       const single = s.answerMode === "single" || qd.kind === "mc";
       if (single && inR) throw new AppError("Kamu sudah menjawab pertanyaan ini.");
       if (!inR && s.maxFastest > 0 && resp.length >= s.maxFastest) throw new AppError("Yah, slot jawaban sudah penuh! Lebih cepat lagi ya ⚡");
 
       const aRef = single ? doc(answersCol, `${q.id}_${pid}`) : doc(answersCol);
-      tx.update(qRef, { responders: inR ? resp : [...resp, pid], answerCount: (qd.answerCount || 0) + 1, lastResponder: pid });
+      tx.set(sRef, { responders: inR ? resp : [...resp, pid], answerCount: (sd.answerCount || 0) + 1, lastResponder: pid });
       tx.set(aRef, {
         questionId: q.id, playerId: pid, uid, name: player.name, kelasLabel: player.kelasLabel || "",
         text, status: "pending", points: 0, createdAt: serverTimestamp(),

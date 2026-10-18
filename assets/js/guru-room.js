@@ -22,12 +22,14 @@ const messagesCol = collection(db, "rooms", code, "messages");
 const msgRef = id => doc(db, "rooms", code, "messages", id);
 const ansRef = id => doc(db, "rooms", code, "answers", id);
 const keyRef = id => doc(db, "rooms", code, "keys", id);
+const slotRef = id => doc(db, "rooms", code, "slots", id);
 const playerRef = id => doc(db, "rooms", code, "players", id);
 
 let me = null, room = null;
 let messages = [], answers = [], players = [], bank = [];
 let keys = {};        // qid → indeks kunci jawaban pilihan ganda (hanya guru)
 let presence = {};    // pid → ms terakhir online
+let slots = {};       // qid → { responders[], answerCount } (hanya dipantau guru)
 let msgKind = "text", pointsDirty = false, timerDirty = false, sending = false;
 let firstFeed = true, ansReady = false;
 const knownAnswers = new Set();
@@ -103,12 +105,23 @@ function start() {
     renderHeader();
     renderSettings();
     renderFeed();
+    renderLiveStats();
+    renderLeaderboard();
+    closeFullQuestions();
   }, err));
 
   unsubs.push(onSnapshot(query(messagesCol, orderBy("createdAt")), snap => {
     messages = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
     renderFeed();
     renderLiveStats();
+  }, err));
+
+  // Daftar penjawab disimpan terpisah dari data soal → HP siswa tidak menerima
+  // pembaruan setiap kali ada teman menjawab (hemat kuota).
+  unsubs.push(onSnapshot(collection(db, "rooms", code, "slots"), snap => {
+    slots = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
+    closeFullQuestions();
+    renderFeed();
   }, err));
 
   unsubs.push(onSnapshot(collection(db, "rooms", code, "keys"), snap => {
@@ -150,6 +163,21 @@ function start() {
 }
 
 const isOnline = p => serverNow() - Math.max(presence[p.id] || 0, tsMillis(p.lastSeen) || 0) < ONLINE_WINDOW;
+const respondersOf = qid => slots[qid]?.responders || [];
+
+/** Slot "N tercepat" penuh → tutup pertanyaan otomatis agar siswa tahu */
+function closeFullQuestions() {
+  const max = settings().maxFastest;
+  if (!max) return;
+  for (const m of openQuestions()) {
+    if (respondersOf(m.id).length >= max && !closing.has(m.id)) {
+      closing.add(m.id);
+      updateDoc(msgRef(m.id), closeFields(m))
+        .then(() => toast(`⚡ Slot ${max} penjawab tercepat penuh — pertanyaan #${m.number} ditutup otomatis.`, "warning"))
+        .catch(() => closing.delete(m.id));
+    }
+  }
+}
 
 /** Field untuk menutup pertanyaan (+ buka kunci jawaban PG agar siswa bisa melihatnya) */
 function closeFields(m) {
@@ -264,6 +292,10 @@ function renderSettings() {
   setIfIdle("#sBonus1", s.bonus1);
   setIfIdle("#sBonus2", s.bonus2);
   setIfIdle("#sBonus3", s.bonus3);
+  $("#sOnline").checked = !!s.trackOnline;
+  $("#onlineHint").textContent = s.trackOnline
+    ? "Hidup — guru melihat siswa yang online (lebih boros kuota)"
+    : "Mati — lebih hemat kuota";
   $("#showHint").textContent = SHOW_HINT[s.showAnswers] || "";
   if (!pointsDirty) $("#qPoints").value = s.defaultPoints;
   if (!timerDirty) $("#qTimer").value = String(s.defaultTimer);
@@ -309,6 +341,7 @@ bindNumber("#sBonus2", "bonus2", "Bonus tercepat #2", 0, 100);
 bindNumber("#sBonus3", "bonus3", "Bonus tercepat #3", 0, 100);
 $("#sShow").onchange = e => saveSetting("showAnswers", e.target.value, "Visibilitas jawaban");
 $("#sTimer").onchange = e => saveSetting("defaultTimer", Number(e.target.value), "Timer default");
+$("#sOnline").onchange = e => saveSetting("trackOnline", e.target.checked, "Tanda online siswa");
 
 // ---------- Komposer: isian / pilihan ganda / pengumuman ----------
 function setKind(kind) {
@@ -365,7 +398,7 @@ async function sendQuestion(data) {
   const s = settings();
   const batch = writeBatch(db);
   const ref = doc(messagesCol);
-  const base = { text: data.text, createdAt: serverTimestamp(), responders: [], answerCount: 0, deadline: null };
+  const base = { text: data.text, createdAt: serverTimestamp(), deadline: null };
   if (data.kind === "info") {
     batch.set(ref, { ...base, type: "info", status: "closed" });
   } else {
@@ -380,6 +413,7 @@ async function sendQuestion(data) {
       ...(data.kind === "mc" ? { options: data.options, reveal: null } : {})
     });
     if (data.kind === "mc") batch.set(keyRef(ref.id), { correct: data.correct });
+    batch.set(slotRef(ref.id), { responders: [], answerCount: 0 });
   }
   sending = true;
   setLoading($("#sendBtn"), true);
@@ -500,12 +534,14 @@ function autoGrade() {
 // ---------- Feed guru ----------
 function renderLiveStats() {
   const active = players.filter(p => !p.kicked);
-  const online = active.filter(isOnline).length;
   const qn = messages.filter(m => m.type === "question").length;
+  const track = settings().trackOnline;
+  const online = track ? active.filter(isOnline).length : 0;
   $("#liveStats").innerHTML = `
-    <span class="badge badge-success"><span class="dot dot-on"></span>${online}/${active.length} online</span>
+    ${track ? `<span class="badge badge-success"><span class="dot dot-on"></span>${online}/${active.length} online</span>`
+      : `<span class="badge">👥 ${active.length} siswa</span>`}
     <span class="badge hide-sm">❓ ${qn} pertanyaan</span>`;
-  $("#onlineCount").textContent = `${online} online · ${active.length} siswa`;
+  $("#onlineCount").textContent = track ? `${online} online · ${active.length} siswa` : `${active.length} siswa`;
 }
 
 function mcSummary(m, list) {
@@ -528,7 +564,7 @@ function questionCard(m, list) {
   const running = m.status === "open" && dl && dl > now;
   const correct = list.filter(a => a.status === "correct").length;
   const pending = list.filter(a => a.status === "pending").length;
-  const resp = (m.responders || []).length;
+  const resp = respondersOf(m.id).length;
   const bonus = (m.bonus || []).filter(Boolean);
   const correctPids = new Set();
 
@@ -695,6 +731,7 @@ async function questionAction(act, id) {
       }
       for (const [pid, pts] of Object.entries(scoreBack)) ops.push(b => b.update(playerRef(pid), { score: increment(-pts) }));
       if (m.kind === "mc") ops.push(b => b.delete(keyRef(id)));
+      if (m.type === "question") ops.push(b => b.delete(slotRef(id)));
       ops.push(b => b.delete(msgRef(id)));
       for (let i = 0; i < ops.length; i += 450) {
         const batch = writeBatch(db);
@@ -724,11 +761,11 @@ function renderLeaderboard() {
   const kicked = players.filter(p => p.kicked);
   $("#podium").innerHTML = podiumHtml(list);
   const row = (p, isKicked = false) => {
-    const online = !isKicked && isOnline(p);
+    const online = !isKicked && settings().trackOnline && isOnline(p);
     return `<div class="lb-item ${isKicked ? "kicked" : ""}">
       <span class="lb-rank">${isKicked ? "—" : p.rank}</span>
       ${avatarHtml(p.name)}
-      <div class="lb-name"><b>${esc(p.name)}</b><span><span class="dot ${online ? "dot-on" : ""}"></span>${esc(p.kelasLabel || "")}${isKicked ? " · dikeluarkan" : ""}</span></div>
+      <div class="lb-name"><b>${esc(p.name)}</b><span>${settings().trackOnline ? `<span class="dot ${online ? "dot-on" : ""}"></span>` : ""}${esc(p.kelasLabel || "")}${isKicked ? " · dikeluarkan" : ""}</span></div>
       <span class="lb-score">${p.score || 0}</span>
       <div class="lb-actions">
         ${isKicked

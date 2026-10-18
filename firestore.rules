@@ -86,11 +86,21 @@ service cloud.firestore {
       }
 
       // ---------------- Pertanyaan & pengumuman ----------------
+      // Hanya guru yang mengubah data soal. Siswa tidak pernah menulis ke sini,
+      // sehingga data soal jarang berubah (hemat kuota pembacaan semua HP).
       match /messages/{mid} {
-        // Siswa boleh "mengambil slot" menjawab: menambah ID siswa (pid) ke responders
-        // dan menaikkan answerCount, sesuai mode & batas penjawab tercepat.
+        allow read: if signedIn();
+        allow create, update, delete: if isOwner();
+      }
+
+      // ---------------- Slot penjawab (terpisah dari data soal) ----------------
+      // Siswa "mengambil slot" lewat transaksi: menambah ID siswa (pid) ke responders
+      // dan menaikkan answerCount, sesuai mode & batas penjawab tercepat.
+      // HP siswa tidak memantau koleksi ini secara langsung.
+      match /slots/{qid} {
         function studentTakesSlot() {
           let s = roomData().settings;
+          let q = get(/databases/$(database)/documents/rooms/$(code)/messages/$(qid)).data;
           let before = resource.data.responders;
           let after = request.resource.data.responders;
           let pid = request.resource.data.lastResponder;
@@ -98,18 +108,18 @@ service cloud.firestore {
             && pid is string
             && ownsPlayer(pid)
             && roomData().status != 'ended'
-            && resource.data.type == 'question'
-            && resource.data.status == 'open'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responders', 'answerCount', 'lastResponder'])
+            && q.type == 'question'
+            && q.status == 'open'
+            && request.resource.data.keys().hasOnly(['responders', 'answerCount', 'lastResponder'])
             && request.resource.data.answerCount == resource.data.answerCount + 1
             && (after == before
                 || (after.size() == before.size() + 1
                     && after.hasAll(before)
                     && pid in after
                     && !(pid in before)))
-            && ((s.answerMode != 'single' && resource.data.get('kind', 'text') != 'mc') || !(pid in before))
+            && ((s.answerMode != 'single' && q.get('kind', 'text') != 'mc') || !(pid in before))
             && (s.maxFastest == 0 || after.size() <= s.maxFastest)
-            && (resource.data.deadline == null || request.time < resource.data.deadline);
+            && (q.deadline == null || request.time < q.deadline);
         }
 
         allow read: if signedIn();
@@ -120,13 +130,15 @@ service cloud.firestore {
       // ---------------- Jawaban siswa ----------------
       match /answers/{aid} {
         function canAnswer() {
-          let q = getAfter(/databases/$(database)/documents/rooms/$(code)/messages/$(request.resource.data.questionId)).data;
+          let qid = request.resource.data.questionId;
+          let q = get(/databases/$(database)/documents/rooms/$(code)/messages/$(qid)).data;
+          let slot = getAfter(/databases/$(database)/documents/rooms/$(code)/slots/$(qid)).data;
           let s = roomData().settings;
           let pid = request.resource.data.playerId;
           return pid is string
             && ownsPlayer(pid)
             && q.status == 'open'
-            && pid in q.responders
+            && pid in slot.responders
             && ((s.answerMode != 'single' && q.get('kind', 'text') != 'mc')
                 || aid == request.resource.data.questionId + '_' + pid);
         }
