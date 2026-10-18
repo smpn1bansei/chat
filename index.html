@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Educhat — Kuis Pembelajaran Interaktif</title>
+  <meta name="description" content="Educhat: aplikasi chat kuis pembelajaran untuk siswa dan guru.">
+  <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>try{var t=localStorage.getItem('educhat_theme');document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){}</script>
+</head>
+<body class="bg-fancy">
+  <header class="topbar">
+    <a class="brand" href="index.html">
+      <img class="brand-logo" src="assets/img/logo.svg" alt="">
+      <span class="brand-text">Educhat<small>Kuis Pembelajaran Interaktif</small></span>
+    </a>
+    <div class="spacer"></div>
+    <div class="topbar-actions">
+      <a class="btn btn-ghost btn-sm" href="guru.html">👩‍🏫 <span class="hide-sm">Halaman Guru</span></a>
+      <button class="btn btn-ghost btn-icon" data-theme-toggle title="Ganti tema" aria-label="Ganti tema">🌓</button>
+    </div>
+  </header>
+
+  <main class="landing">
+    <section class="hero">
+      <span class="badge badge-primary" style="margin-bottom:14px">✨ Belajar sambil bermain</span>
+      <h1>Jawab cepat, <span class="grad">raih poin</span>, jadi juara kelas!</h1>
+      <p class="lead">Educhat adalah ruang chat kuis interaktif. Guru melempar pertanyaan, kamu menjawab secepat kilat, dan papan skor ter-update secara langsung.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div><b>Masukkan identitas</b><span>Tulis nama lengkap dan pilih kelasmu.</span></div></div>
+        <div class="step"><div class="step-num">2</div><div><b>Ketik kode room</b><span>4 digit kode yang diberikan oleh gurumu.</span></div></div>
+        <div class="step"><div class="step-num">3</div><div><b>Jawab &amp; kumpulkan poin</b><span>Jawaban benar dari guru = poin di papan skor.</span></div></div>
+      </div>
+    </section>
+
+    <section class="card join-card">
+      <h2>Masuk Room 🚀</h2>
+      <p class="sub">Isi data di bawah untuk bergabung ke kuis.</p>
+      <form id="joinForm" autocomplete="off" novalidate>
+        <label class="field">
+          <span>Nama Siswa</span>
+          <input id="name" maxlength="40" placeholder="cth. Budi Santoso" required>
+        </label>
+
+        <div class="field">
+          <span>Kelas</span>
+          <div class="kelas-pills" id="kelasPills"></div>
+        </div>
+
+        <label class="field">
+          <span>Rombel / Jurusan</span>
+          <input id="rombel" maxlength="20" placeholder="cth. IPA 1, A, TKJ 2" required>
+        </label>
+
+        <label class="field">
+          <span>Kode Room</span>
+          <input id="room" class="input-code" inputmode="numeric" maxlength="4" placeholder="••••" required>
+        </label>
+
+        <button class="btn btn-primary btn-lg btn-block" id="joinBtn" type="submit">Gabung Sekarang →</button>
+      </form>
+
+      <div class="divider">atau</div>
+      <a class="teacher-link" href="guru.html">
+        <span style="font-size:1.4rem">👩‍🏫</span>
+        <span>Saya guru<br><small class="muted" style="font-weight:600">Masuk untuk membuat &amp; mengelola room</small></span>
+        <span class="arrow">→</span>
+      </a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Development by <b>Andri Fernanda, S.Pd., Gr.</b> &copy; 2026
+  </footer>
+
+  <script type="module" src="assets/js/siswa-join.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Room Kuis — Educhat</title>
+  <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>try{var t=localStorage.getItem('educhat_theme');document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){}</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js" defer></script>
+</head>
+<body class="room-page">
+  <div class="overlay" id="loading"><div class="loader-page"><span class="spinner"></span>Memasuki room…</div></div>
+
+  <header class="topbar">
+    <a class="brand" href="index.html" title="Educhat">
+      <img class="brand-logo" src="assets/img/logo.svg" alt="">
+      <span class="brand-text">Educhat</span>
+    </a>
+    <div class="room-badge">
+      <span class="code" id="roomCode">----</span>
+      <div class="info"><b id="roomName">Memuat…</b><span id="roomOwner"></span></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="topbar-actions">
+      <span class="score-chip" id="myScore" title="Poin kamu">⭐ <span>0</span></span>
+      <button class="btn btn-ghost btn-icon" data-theme-toggle title="Ganti tema" aria-label="Ganti tema">🌓</button>
+      <button class="btn btn-ghost btn-icon" id="soundBtn" title="Suara" aria-label="Suara">🔔</button>
+      <button class="btn btn-ghost btn-sm" id="leaveBtn" title="Keluar room">🚪 <span class="hide-sm">Keluar</span></button>
+    </div>
+  </header>
+
+  <main class="room-layout student">
+    <section class="panel tab-pane show" data-pane="chat">
+      <div class="panel-head">
+        <h3>💬 Ruang Kuis</h3>
+        <div class="status-bar" id="roomStatus"></div>
+      </div>
+      <div class="feed" id="feed"></div>
+      <div class="composer" id="composer">
+        <div class="reply-to hidden" id="replyTo"></div>
+        <div class="composer-hint" id="composerHint">Menunggu pertanyaan dari guru…</div>
+        <form class="composer-row" id="answerForm">
+          <textarea id="answerInput" rows="1" maxlength="500" placeholder="Ketik jawabanmu…" disabled></textarea>
+          <button class="btn btn-primary btn-send" id="sendBtn" type="submit" disabled aria-label="Kirim jawaban">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <aside class="panel tab-pane" data-pane="rank">
+      <div class="panel-head">
+        <h3>🏆 Papan Skor</h3>
+        <span class="badge" id="playerCount">0 siswa</span>
+      </div>
+      <div class="panel-body">
+        <div class="my-rank" id="myRank"></div>
+        <div class="podium" id="podium"></div>
+        <div class="lb-list" id="lbList"></div>
+      </div>
+    </aside>
+  </main>
+
+  <nav class="mobile-tabs" id="mobileTabs">
+    <button class="active" data-tab="chat"><span class="ico">💬</span>Chat<i class="ping hidden"></i></button>
+    <button data-tab="rank"><span class="ico">🏆</span>Papan Skor</button>
+  </nav>
+
+  <footer class="footer">
+    Development by <b>Andri Fernanda, S.Pd., Gr.</b> &copy; 2026
+  </footer>
+
+  <script type="module" src="assets/js/siswa-room.js"></script>
+</body>
+</html>

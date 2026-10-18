@@ -1,0 +1,121 @@
+rules_version = '2';
+
+// =============================================================
+//  EDUCHAT — Aturan keamanan Cloud Firestore
+//  - Guru  : login Email/Password (bukan anonymous)
+//  - Siswa : login Anonymous (otomatis saat masuk room)
+// =============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isTeacher() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Profil guru
+    match /teachers/{uid} {
+      allow read: if signedIn();
+      allow write: if isTeacher() && request.auth.uid == uid;
+    }
+
+    match /rooms/{code} {
+      function roomData() { return get(/databases/$(database)/documents/rooms/$(code)).data; }
+      function isOwner() { return isTeacher() && roomData().ownerUid == request.auth.uid; }
+      function playerPath(uid) { return /databases/$(database)/documents/rooms/$(code)/players/$(uid); }
+
+      // Semua pengguna yang login boleh melihat daftar room (termasuk milik guru lain)
+      allow read: if signedIn();
+
+      // Kode 4 digit = ID dokumen → otomatis unik. "create" hanya berlaku bila
+      // dokumen belum ada, sehingga kode milik guru lain tidak bisa ditimpa.
+      allow create: if isTeacher()
+        && code.matches('^[0-9]{4}$')
+        && request.resource.data.code == code
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.settings.answerMode in ['single', 'multiple']
+        && request.resource.data.settings.maxFastest is int
+        && request.resource.data.settings.defaultPoints is int;
+
+      // Hanya pembuat room yang boleh mengelola / menghapus
+      allow update: if isTeacher()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.code == resource.data.code;
+      allow delete: if isTeacher() && resource.data.ownerUid == request.auth.uid;
+
+      // ---------------- Peserta ----------------
+      match /players/{uid} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.score == 0
+          && request.resource.data.kicked == false
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 40
+          && roomData().status == 'open';
+        // Siswa hanya boleh memperbarui profil & tanda online — bukan poin.
+        allow update: if isOwner()
+          || (signedIn() && request.auth.uid == uid
+              && resource.data.kicked == false
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['name', 'kelas', 'rombel', 'kelasLabel', 'lastSeen']));
+        allow delete: if isOwner();
+      }
+
+      // ---------------- Pertanyaan & pengumuman ----------------
+      match /messages/{mid} {
+        // Siswa boleh "mengambil slot" menjawab: menambah uid ke responders
+        // dan menaikkan answerCount, sesuai mode & batas penjawab tercepat.
+        function studentTakesSlot() {
+          let s = roomData().settings;
+          let before = resource.data.responders;
+          let after = request.resource.data.responders;
+          return signedIn()
+            && roomData().status != 'ended'
+            && resource.data.type == 'question'
+            && resource.data.status == 'open'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responders', 'answerCount'])
+            && request.resource.data.answerCount == resource.data.answerCount + 1
+            && (after == before
+                || (after.size() == before.size() + 1
+                    && after.hasAll(before)
+                    && request.auth.uid in after
+                    && !(request.auth.uid in before)))
+            && (s.answerMode != 'single' || !(request.auth.uid in before))
+            && (s.maxFastest == 0 || after.size() <= s.maxFastest)
+            && (resource.data.deadline == null || request.time < resource.data.deadline);
+        }
+
+        allow read: if signedIn();
+        allow create, delete: if isOwner();
+        allow update: if isOwner() || studentTakesSlot();
+      }
+
+      // ---------------- Jawaban siswa ----------------
+      match /answers/{aid} {
+        function canAnswer() {
+          let q = getAfter(/databases/$(database)/documents/rooms/$(code)/messages/$(request.resource.data.questionId)).data;
+          let s = roomData().settings;
+          return exists(playerPath(request.auth.uid))
+            && get(playerPath(request.auth.uid)).data.kicked == false
+            && q.status == 'open'
+            && request.auth.uid in q.responders
+            && (s.answerMode != 'single' || aid == request.resource.data.questionId + '_' + request.auth.uid);
+        }
+
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.points == 0
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && canAnswer();
+        // Penilaian (benar/salah) hanya oleh guru pemilik room
+        allow update, delete: if isOwner();
+      }
+    }
+  }
+}

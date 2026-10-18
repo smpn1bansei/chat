@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "educhat",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5517", "--directory", "D:/Proyek/Educhat"],
+      "port": 5517
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kelola Room — Educhat</title>
+  <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>try{var t=localStorage.getItem('educhat_theme');document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){}</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+</head>
+<body class="room-page teacher-page">
+  <div class="overlay" id="loading"><div class="loader-page"><span class="spinner"></span>Membuka room…</div></div>
+
+  <header class="topbar">
+    <a class="btn btn-ghost btn-icon" href="guru.html" title="Kembali ke dashboard" aria-label="Kembali">←</a>
+    <div class="room-badge">
+      <span class="code" id="roomCode">----</span>
+      <div class="info"><b id="roomName">Memuat…</b><span id="roomSub"></span></div>
+    </div>
+    <span id="statusBadge"></span>
+    <div class="spacer"></div>
+    <div class="topbar-actions">
+      <button class="btn btn-soft btn-sm" id="projBtn" title="Tampilkan kode & skor di proyektor">📺 <span class="hide-sm">Layar Proyektor</span></button>
+      <button class="btn btn-ghost btn-icon" data-theme-toggle title="Ganti tema" aria-label="Ganti tema">🌓</button>
+    </div>
+  </header>
+
+  <main class="room-layout teacher">
+    <!-- Kiri: pengaturan -->
+    <aside class="side-scroll col-left tab-pane" data-pane="settings">
+      <section class="panel">
+        <div class="panel-head"><h3>⚙️ Pengaturan Room</h3><span class="badge badge-accent" id="saveState">Live</span></div>
+        <div class="panel-body">
+          <div class="setting-item">
+            <span class="lbl">Mode jawaban siswa</span>
+            <div class="seg" id="sMode">
+              <button data-v="single">1× jawab</button>
+              <button data-v="multiple">Berkali-kali</button>
+            </div>
+            <p class="hint" id="modeHint"></p>
+          </div>
+          <div class="setting-item">
+            <label for="sPoints">Poin default per pertanyaan</label>
+            <div class="num-input">
+              <button class="btn btn-ghost btn-icon btn-sm" data-step="sPoints" data-d="-5">−</button>
+              <input type="number" id="sPoints" min="1" max="1000">
+              <button class="btn btn-ghost btn-icon btn-sm" data-step="sPoints" data-d="5">＋</button>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label for="sMax">Maks. penjawab tercepat</label>
+            <div class="num-input">
+              <button class="btn btn-ghost btn-icon btn-sm" data-step="sMax" data-d="-1">−</button>
+              <input type="number" id="sMax" min="0" max="500">
+              <button class="btn btn-ghost btn-icon btn-sm" data-step="sMax" data-d="1">＋</button>
+            </div>
+            <p class="hint">0 = tanpa batas. Contoh 5 = hanya 5 siswa tercepat yang bisa mengirim.</p>
+          </div>
+          <div class="setting-item">
+            <label for="sShow">Jawaban teman terlihat</label>
+            <select id="sShow">
+              <option value="closed">Setelah pertanyaan ditutup</option>
+              <option value="always">Langsung terlihat</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label for="sTimer">Timer default pertanyaan</label>
+            <select id="sTimer">
+              <option value="0">Tanpa batas waktu</option>
+              <option value="15">15 detik</option>
+              <option value="30">30 detik</option>
+              <option value="60">1 menit</option>
+              <option value="90">90 detik</option>
+              <option value="120">2 menit</option>
+              <option value="300">5 menit</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h3>🎛️ Kontrol Room</h3></div>
+        <div class="panel-body" style="display:grid;gap:8px">
+          <button class="btn btn-ghost btn-block" id="lockBtn">🔒 Kunci room</button>
+          <button class="btn btn-ghost btn-block" id="endBtn">⏹ Akhiri permainan</button>
+          <button class="btn btn-ghost btn-block" id="exportBtn">📥 Unduh rekap nilai (CSV)</button>
+          <button class="btn btn-danger-soft btn-block" id="deleteBtn">🗑 Hapus room</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Tengah: chat kuis -->
+    <section class="panel col-center tab-pane show" data-pane="chat">
+      <div class="panel-head">
+        <h3>💬 Live Kuis</h3>
+        <div class="status-bar" id="liveStats"></div>
+      </div>
+      <div class="feed" id="feed"></div>
+      <div class="compose-box">
+        <div class="composer-row">
+          <textarea id="qText" maxlength="1000" placeholder="Tulis pertanyaan untuk siswa… (Enter untuk kirim, Shift+Enter baris baru)"></textarea>
+          <button class="btn btn-primary btn-send" id="sendBtn" aria-label="Kirim">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+          </button>
+        </div>
+        <div class="compose-opts">
+          <div class="seg" id="qType">
+            <button class="active" data-v="question">❓ Pertanyaan</button>
+            <button data-v="info">📢 Pengumuman</button>
+          </div>
+          <label class="mini q-only">Poin <input type="number" id="qPoints" min="1" max="1000"></label>
+          <label class="mini q-only">⏱ <select id="qTimer">
+            <option value="0">Tanpa batas</option>
+            <option value="15">15 dtk</option>
+            <option value="30">30 dtk</option>
+            <option value="60">1 mnt</option>
+            <option value="90">90 dtk</option>
+            <option value="120">2 mnt</option>
+            <option value="300">5 mnt</option>
+          </select></label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Kanan: papan skor -->
+    <aside class="panel col-right tab-pane" data-pane="rank">
+      <div class="panel-head">
+        <h3>🏆 Papan Skor</h3>
+        <span class="badge" id="onlineCount">0 online</span>
+      </div>
+      <div class="panel-body">
+        <div class="podium" id="podium"></div>
+        <div class="lb-list" id="lbList"></div>
+      </div>
+    </aside>
+  </main>
+
+  <nav class="mobile-tabs" id="mobileTabs">
+    <button data-tab="settings"><span class="ico">⚙️</span>Pengaturan</button>
+    <button class="active" data-tab="chat"><span class="ico">💬</span>Kuis</button>
+    <button data-tab="rank"><span class="ico">🏆</span>Skor</button>
+  </nav>
+
+  <!-- Modal proyektor -->
+  <div class="modal-back" id="projModal">
+    <div class="modal modal-xl">
+      <div class="modal-head">
+        <h3 class="modal-title" style="margin:0">📺 Layar Proyektor</h3>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" id="copyLink">🔗 Salin link</button>
+          <button class="btn btn-ghost btn-sm" id="fsBtn">⛶ Layar penuh</button>
+          <button class="btn btn-ghost btn-icon btn-sm" id="projClose" aria-label="Tutup">✕</button>
+        </div>
+      </div>
+      <div class="projector">
+        <div class="proj-code">
+          <div class="lbl">Buka Educhat lalu masukkan kode room:</div>
+          <div class="big" id="projCode">----</div>
+          <div class="qr-box" id="qrBox"></div>
+          <div class="proj-url" id="projUrl"></div>
+        </div>
+        <div>
+          <h3 style="font-size:1.2rem;font-weight:800;margin-bottom:14px">🏆 Papan Skor Teratas</h3>
+          <div class="podium" id="projPodium"></div>
+          <div class="lb-list" id="projList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Development by <b>Andri Fernanda, S.Pd., Gr.</b> &copy; 2026
+  </footer>
+
+  <script type="module" src="assets/js/guru-room.js"></script>
+</body>
+</html>
